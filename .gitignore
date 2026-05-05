@@ -1,0 +1,17 @@
+# Runtime output
+logs/
+web_ui/backups/
+
+# Local/generated scan data
+web_ui/data/software_full.csv
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+

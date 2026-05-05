@@ -1,7 +1,7 @@
 {
   "version": "v43",
-  "name": "Scanner STABLE Self-Healing CSV",
-  "buildDate": "2026-05-05 18:44:35",
+  "name": "Safety Guard + Scanner STABLE",
+  "buildDate": "2026-05-05 21:45:00",
   "features": [
     "Notion Export ZIP",
     "CSV per table",
@@ -25,6 +25,9 @@
     "Self-Healing CSV",
     "Auto CSV Repair",
     "Header validation",
-    "Scanner STABLE"
+    "Scanner STABLE",
+    "Safety confirmations",
+    "Server payload validation",
+    "Updated documentation"
   ]
 }

@@ -1,9 +1,10 @@
 ﻿<#
-IT-Verwaltung v41 - Windows Hardware Scanner PRO
+IT-Verwaltung v43 - Windows Hardware Scanner PRO
 - keine += Fehler durch List[object]
 - CSV-Validierung
 - Logging
 - Backup
+- sichere CIM/WMI-Fehlerbehandlung
 - optional vollständige Softwareliste
 #>
 
@@ -32,6 +33,66 @@ function Write-Log {
     else{ Write-Host $line }
 }
 
+$CimFailures = New-Object System.Collections.Generic.List[string]
+
+function Test-IsAccessDenied {
+    param($ErrorRecord)
+    $message = [string]$ErrorRecord.Exception.Message
+    $hresult = "{0:X8}" -f ($ErrorRecord.Exception.HResult -band 0xffffffff)
+
+    return (
+        $ErrorRecord.Exception -is [System.UnauthorizedAccessException] -or
+        $hresult -eq "80041003" -or
+        $message -match "Zugriff verweigert|Access denied|Unauthorized|0x80041003"
+    )
+}
+
+function Get-CimSafe {
+    param(
+        [string]$ClassName,
+        [string]$Label,
+        [string]$Level="WARN"
+    )
+
+    try {
+        return @(Get-CimInstance -ClassName $ClassName -ErrorAction Stop)
+    } catch {
+        $kind = if(Test-IsAccessDenied $_){"Zugriff verweigert"}else{"Fehler"}
+        $message = "${Label} CIM/${ClassName} ${kind}: $($_.Exception.Message)"
+        [void]$CimFailures.Add($message)
+        Write-Log $message $Level
+        return @()
+    }
+}
+
+function Keep-ExistingIfEmpty {
+    param(
+        $NewValue,
+        $ExistingRow,
+        [string]$Column,
+        [string]$Fallback=""
+    )
+
+    if($null -ne $NewValue -and [string]$NewValue -ne ""){ return [string]$NewValue }
+    if($ExistingRow -and $ExistingRow.PSObject.Properties.Name -contains $Column -and [string]$ExistingRow.$Column -ne ""){
+        return [string]$ExistingRow.$Column
+    }
+    return $Fallback
+}
+
+function Get-ExistingOrDefault {
+    param(
+        $ExistingRow,
+        [string]$Column,
+        [string]$Fallback=""
+    )
+
+    if($ExistingRow -and $ExistingRow.PSObject.Properties.Name -contains $Column -and [string]$ExistingRow.$Column -ne ""){
+        return [string]$ExistingRow.$Column
+    }
+    return $Fallback
+}
+
 
 # ===== v43 SELF-HEALING CSV HELPERS =====
 function Get-DelimiterFromHeader {
@@ -39,6 +100,11 @@ function Get-DelimiterFromHeader {
     if($Header -match ";"){ return ";" }
     if($Header -match ","){ return "," }
     return ";"
+}
+
+function Normalize-CsvHeaderName {
+    param([string]$Name)
+    return ([string]$Name).Trim().Trim([char]0xFEFF).Trim('"')
 }
 
 function Convert-ExistingCsvToRequiredColumns {
@@ -62,7 +128,7 @@ function Convert-ExistingCsvToRequiredColumns {
 
     $header = [string]$content[0]
     $delimiter = Get-DelimiterFromHeader $header
-    $headers = @($header -split [regex]::Escape($delimiter))
+    $headers = @($header -split [regex]::Escape($delimiter) | ForEach-Object { Normalize-CsvHeaderName $_ })
     $missing = @($RequiredColumns | Where-Object { $_ -notin $headers })
 
     if($missing.Count -eq 0 -and $delimiter -eq ";"){ return }
@@ -194,27 +260,34 @@ $Hardware = @(Read-CsvSafe -Path $HardwareCsv -DefaultColumns $HardwareColumns)
 $Netzwerk = @(Read-CsvSafe -Path $NetzwerkCsv -DefaultColumns $NetzwerkColumns)
 $Software = @(Read-CsvSafe -Path $SoftwareCsv -DefaultColumns $SoftwareColumns)
 
-try { $CS = Get-CimInstance Win32_ComputerSystem } catch { Write-Log "ComputerSystem Fehler: $($_.Exception.Message)" "ERROR"; $CS=$null }
-try { $BIOS = Get-CimInstance Win32_BIOS } catch { Write-Log "BIOS Fehler: $($_.Exception.Message)" "ERROR"; $BIOS=$null }
-try { $CPU = Get-CimInstance Win32_Processor | Select-Object -First 1 } catch { Write-Log "CPU Fehler: $($_.Exception.Message)" "ERROR"; $CPU=$null }
-try { $OS = Get-CimInstance Win32_OperatingSystem } catch { Write-Log "OS Fehler: $($_.Exception.Message)" "ERROR"; $OS=$null }
-try { $RamBytes = (Get-CimInstance Win32_PhysicalMemory | Measure-Object Capacity -Sum).Sum; $RamGB = if($RamBytes){[math]::Round($RamBytes/1GB,0)}else{""} } catch { $RamGB=""; Write-Log "RAM Fehler: $($_.Exception.Message)" "WARN" }
-try { $DiskBytes = (Get-CimInstance Win32_DiskDrive | Where-Object { $_.MediaType -notmatch "Removable" } | Measure-Object Size -Sum).Sum; $DiskGB = if($DiskBytes){[math]::Round($DiskBytes/1GB,0)}else{""} } catch { $DiskGB=""; Write-Log "Disk Fehler: $($_.Exception.Message)" "WARN" }
-try { $Monitors = @(Get-CimInstance Win32_DesktopMonitor -ErrorAction SilentlyContinue | Where-Object { $_.Name } | Select-Object -ExpandProperty Name) -join ", " } catch { $Monitors=""; Write-Log "Monitor Fehler: $($_.Exception.Message)" "WARN" }
+$CS = @(Get-CimSafe "Win32_ComputerSystem" "ComputerSystem" "ERROR" | Where-Object { $_ }) | Select-Object -First 1
+$BIOS = @(Get-CimSafe "Win32_BIOS" "BIOS" "ERROR" | Where-Object { $_ }) | Select-Object -First 1
+$CPU = @(Get-CimSafe "Win32_Processor" "CPU" "ERROR" | Where-Object { $_ }) | Select-Object -First 1
+$OS = @(Get-CimSafe "Win32_OperatingSystem" "OS" "ERROR" | Where-Object { $_ }) | Select-Object -First 1
+
+$PhysicalMemory = @(Get-CimSafe "Win32_PhysicalMemory" "RAM" "WARN" | Where-Object { $_ })
+$RamBytes = if($PhysicalMemory.Count -gt 0){ ($PhysicalMemory | Measure-Object Capacity -Sum).Sum }else{ $null }
+$RamGB = if($RamBytes){[math]::Round($RamBytes/1GB,0)}else{""}
+
+$DiskDrives = @(Get-CimSafe "Win32_DiskDrive" "Disk" "WARN" | Where-Object { $_ })
+$DiskBytes = if($DiskDrives.Count -gt 0){ ($DiskDrives | Where-Object { $_.MediaType -notmatch "Removable" } | Measure-Object Size -Sum).Sum }else{ $null }
+$DiskGB = if($DiskBytes){[math]::Round($DiskBytes/1GB,0)}else{""}
+
+$DesktopMonitors = @(Get-CimSafe "Win32_DesktopMonitor" "Monitor" "WARN" | Where-Object { $_ })
+$Monitors = @($DesktopMonitors | Where-Object { $_.Name } | Select-Object -ExpandProperty Name) -join ", "
 
 $Hostname = $env:COMPUTERNAME
 $Domain = if($CS -and $CS.PartOfDomain){$CS.Domain}else{"WORKGROUP"}
 $AssetType = if($CS){Get-AssetType $CS}else{"PC"}
 $Serial = if($BIOS){Get-First $BIOS.SerialNumber}else{""}
 
-try {
-    $NIC = Get-CimInstance Win32_NetworkAdapterConfiguration | Where-Object { $_.IPEnabled -eq $true -and $_.MACAddress } | Select-Object -First 1
-} catch { $NIC=$null; Write-Log "NIC Fehler: $($_.Exception.Message)" "WARN" }
+$NetworkAdapters = @(Get-CimSafe "Win32_NetworkAdapterConfiguration" "NIC" "WARN" | Where-Object { $_ })
+$NIC = $NetworkAdapters | Where-Object { $_.IPEnabled -eq $true -and $_.MACAddress } | Select-Object -First 1
 
 $IP = if($NIC -and $NIC.IPAddress){($NIC.IPAddress | Where-Object { $_ -match "^\d+\.\d+\.\d+\.\d+$" } | Select-Object -First 1)}else{""}
 $MAC = if($NIC){Get-First $NIC.MACAddress}else{""}
 $DNS = if($NIC -and $NIC.DNSServerSearchOrder){($NIC.DNSServerSearchOrder -join ", ")}else{""}
-$DHCP = if($NIC -and $NIC.DHCPEnabled){"DHCP"}else{"Statisch"}
+$DHCP = if($NIC){if($NIC.DHCPEnabled){"DHCP"}else{"Statisch"}}else{""}
 
 $ExistingAsset = $Assets | Where-Object { $_."Gerätename" -eq $Hostname -or ($Serial -and $_."Seriennummer" -eq $Serial) } | Select-Object -First 1
 $AssetId = if($ExistingAsset){$ExistingAsset."Asset-ID"}else{Get-NextId $Assets "Asset-ID" "AS-"}
@@ -223,14 +296,39 @@ $HardwareId = if($ExistingHardware){$ExistingHardware."Hardware-ID"}else{Get-Nex
 $ExistingNetzwerk = $Netzwerk | Where-Object { $_."Asset-ID" -eq $AssetId } | Select-Object -First 1
 $NetzwerkId = if($ExistingNetzwerk){$ExistingNetzwerk."Netzwerk-ID"}else{Get-NextId $Netzwerk "Netzwerk-ID" "NET-"}
 
+$ScanStatus = if($CimFailures.Count -gt 0){
+    "Automatisch erfasst eingeschraenkt: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss'). CIM/WMI Fehler: $($CimFailures.Count). Siehe Log: $(Split-Path $LogFile -Leaf)"
+}else{
+    "Automatisch erfasst: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+}
+
+$AssetManufacturer = Keep-ExistingIfEmpty (if($CS){Get-First $CS.Manufacturer}else{""}) $ExistingAsset "Hersteller"
+$AssetModel = Keep-ExistingIfEmpty (if($CS){Get-First $CS.Model}else{""}) $ExistingAsset "Modell"
+$AssetSerial = Keep-ExistingIfEmpty $Serial $ExistingAsset "Seriennummer"
+$AssetOS = Keep-ExistingIfEmpty (if($OS){Get-First $OS.Caption}else{""}) $ExistingAsset "Betriebssystem"
+$AssetDomain = Keep-ExistingIfEmpty $Domain $ExistingAsset "Domäne" "WORKGROUP"
+$AssetNotes = if($ExistingAsset -and $ExistingAsset.Notizen){$ExistingAsset.Notizen}else{$ScanStatus}
+
+$HardwareCpu = Keep-ExistingIfEmpty (if($CPU){Get-First $CPU.Name}else{""}) $ExistingHardware "CPU"
+$HardwareRam = Keep-ExistingIfEmpty (if($RamGB){"$RamGB GB"}else{""}) $ExistingHardware "RAM"
+$HardwareDisk = Keep-ExistingIfEmpty (if($DiskGB){"$DiskGB GB"}else{""}) $ExistingHardware "Speicher"
+$HardwareMonitor = Keep-ExistingIfEmpty $Monitors $ExistingHardware "Monitor"
+$HardwareRemark = if($CimFailures.Count -gt 0){$ScanStatus}else{"Automatisch erfasst durch Scanner PRO."}
+
+$NetworkIp = Keep-ExistingIfEmpty $IP $ExistingNetzwerk "IP-Adresse"
+$NetworkMac = Keep-ExistingIfEmpty $MAC $ExistingNetzwerk "MAC-Adresse"
+$NetworkDns = Keep-ExistingIfEmpty $DNS $ExistingNetzwerk "DNS"
+$NetworkAddressType = Keep-ExistingIfEmpty $DHCP $ExistingNetzwerk "Adressart"
+$NetworkRemark = if($CimFailures.Count -gt 0){$ScanStatus}else{"Automatisch erfasst. Verbindungstyp bitte prüfen."}
+
 $Assets = @(Upsert-Row $Assets "Asset-ID" $AssetId @{
-    "Asset-ID"=$AssetId; "Gerätename"=$Hostname; "Asset-Typ"=$AssetType; "Standort"=if($ExistingAsset){$ExistingAsset.Standort}else{""}; "Raum"=if($ExistingAsset){$ExistingAsset.Raum}else{""}; "Status"="Aktiv"; "Hauptnutzer"=$env:USERNAME; "Hersteller"=if($CS){Get-First $CS.Manufacturer}else{""}; "Modellserie"=if($ExistingAsset){$ExistingAsset.Modellserie}else{""}; "Modell"=if($CS){Get-First $CS.Model}else{""}; "Seriennummer"=$Serial; "Inventarnummer"=if($ExistingAsset){$ExistingAsset.Inventarnummer}else{""}; "Betriebssystem"=if($OS){Get-First $OS.Caption}else{""}; "Domäne"=$Domain; "Notizen"="Automatisch erfasst: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+    "Asset-ID"=$AssetId; "Gerätename"=$Hostname; "Asset-Typ"=$AssetType; "Standort"=Get-ExistingOrDefault $ExistingAsset "Standort"; "Raum"=Get-ExistingOrDefault $ExistingAsset "Raum"; "Status"="Aktiv"; "Hauptnutzer"=$env:USERNAME; "Hersteller"=$AssetManufacturer; "Modellserie"=Get-ExistingOrDefault $ExistingAsset "Modellserie"; "Modell"=$AssetModel; "Seriennummer"=$AssetSerial; "Inventarnummer"=Get-ExistingOrDefault $ExistingAsset "Inventarnummer"; "Betriebssystem"=$AssetOS; "Domäne"=$AssetDomain; "Notizen"=$AssetNotes
 })
 $Hardware = @(Upsert-Row $Hardware "Hardware-ID" $HardwareId @{
-    "Hardware-ID"=$HardwareId; "Asset-ID"=$AssetId; "Gerätename"=$Hostname; "CPU"=if($CPU){Get-First $CPU.Name}else{""}; "RAM"=if($RamGB){"$RamGB GB"}else{""}; "Speicher"=if($DiskGB){"$DiskGB GB"}else{""}; "Monitor"=$Monitors; "Dockingstation"=if($ExistingHardware){$ExistingHardware.Dockingstation}else{""}; "Garantie bis"=if($ExistingHardware){$ExistingHardware."Garantie bis"}else{""}; "Bemerkung"="Automatisch erfasst durch Scanner PRO."
+    "Hardware-ID"=$HardwareId; "Asset-ID"=$AssetId; "Gerätename"=$Hostname; "CPU"=$HardwareCpu; "RAM"=$HardwareRam; "Speicher"=$HardwareDisk; "Monitor"=$HardwareMonitor; "Dockingstation"=Get-ExistingOrDefault $ExistingHardware "Dockingstation"; "Garantie bis"=Get-ExistingOrDefault $ExistingHardware "Garantie bis"; "Bemerkung"=$HardwareRemark
 })
 $Netzwerk = @(Upsert-Row $Netzwerk "Netzwerk-ID" $NetzwerkId @{
-    "Netzwerk-ID"=$NetzwerkId; "Asset-ID"=$AssetId; "Gerätename"=$Hostname; "Netzwerktyp"="LAN/WLAN"; "Adressart"=$DHCP; "Verbindungstyp"=if($ExistingNetzwerk){$ExistingNetzwerk.Verbindungstyp}else{""}; "IP-Adresse"=$IP; "MAC-Adresse"=$MAC; "DNS"=$DNS; "VLAN"=if($ExistingNetzwerk){$ExistingNetzwerk.VLAN}else{""}; "Switch-Port"=if($ExistingNetzwerk){$ExistingNetzwerk."Switch-Port"}else{""}; "Wanddose"=if($ExistingNetzwerk){$ExistingNetzwerk.Wanddose}else{""}; "Access Point"=if($ExistingNetzwerk){$ExistingNetzwerk."Access Point"}else{""}; "SSID"=if($ExistingNetzwerk){$ExistingNetzwerk.SSID}else{""}; "Bemerkung"="Automatisch erfasst. Verbindungstyp bitte prüfen."
+    "Netzwerk-ID"=$NetzwerkId; "Asset-ID"=$AssetId; "Gerätename"=$Hostname; "Netzwerktyp"="LAN/WLAN"; "Adressart"=$NetworkAddressType; "Verbindungstyp"=Get-ExistingOrDefault $ExistingNetzwerk "Verbindungstyp"; "IP-Adresse"=$NetworkIp; "MAC-Adresse"=$NetworkMac; "DNS"=$NetworkDns; "VLAN"=Get-ExistingOrDefault $ExistingNetzwerk "VLAN"; "Switch-Port"=Get-ExistingOrDefault $ExistingNetzwerk "Switch-Port"; "Wanddose"=Get-ExistingOrDefault $ExistingNetzwerk "Wanddose"; "Access Point"=Get-ExistingOrDefault $ExistingNetzwerk "Access Point"; "SSID"=Get-ExistingOrDefault $ExistingNetzwerk "SSID"; "Bemerkung"=$NetworkRemark
 })
 
 function Get-InstalledSoftwareList {
@@ -282,7 +380,7 @@ function Test-CsvRequiredColumns {
     try {
         $headerLine = Get-Content -Path $Path -Encoding UTF8 -TotalCount 1
         if(-not $headerLine){ return "Header fehlt: ${Path}" }
-        $headers = $headerLine -split ";"
+        $headers = @($headerLine -split ";" | ForEach-Object { Normalize-CsvHeaderName $_ })
         $missing = $RequiredColumns | Where-Object { $_ -notin $headers }
         if($missing.Count -gt 0){ return "Spalten fehlen in ${Path}: $($missing -join ', ')" }
         return $null
@@ -308,5 +406,10 @@ Write-Host "Backup:     $BackupDir"
 Write-Host "Log:        $LogFile"
 Write-Host ""
 if($ValidationErrors.Count -gt 0){ Write-Host "Validierung: FEHLER - bitte Log prüfen." -ForegroundColor Red } else { Write-Host "Validierung: OK" -ForegroundColor Green }
+if($CimFailures.Count -gt 0){
+    Write-Host "CIM/WMI:    EINGESCHRAENKT ($($CimFailures.Count) Fehler) - siehe Log." -ForegroundColor Yellow
+}else{
+    Write-Host "CIM/WMI:    OK" -ForegroundColor Green
+}
 Write-Host ""
 Write-Host "Starte danach start.bat neu oder lade die Seite neu." -ForegroundColor Yellow

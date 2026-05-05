@@ -1,7 +1,12 @@
-﻿
+$ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Web = Join-Path $Root "web_ui"
-$Port = 8765
-Start-Process "http://localhost:$Port"
-Set-Location $Web
-python -m http.server $Port
+Set-Location $Root
+
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    python app_server.py
+} elseif (Get-Command py -ErrorAction SilentlyContinue) {
+    py app_server.py
+} else {
+    throw "Python wurde nicht gefunden."
+}
+

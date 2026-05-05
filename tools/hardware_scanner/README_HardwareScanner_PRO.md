@@ -8,6 +8,8 @@ Normal:
 Mit vollständiger Softwareliste:
 `Start-HardwareScan-FullSoftware.bat`
 
+Der Full-Software-Scan erzeugt `web_ui/data/software_full.csv` als lokales Scanner-Artefakt. Diese Datei ist kein produktiver Web-App-Datenbestand, wird nicht versioniert und nicht ueber `/api/load`, `/api/save` oder `/api/backup` verwaltet.
+
 ## Fix
 
 Der alte Fehler `op_Addition` wurde beseitigt.

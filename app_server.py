@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-IT-Verwaltung v20 - Portabler CSV Server
+IT-Verwaltung v43 - Safety Guard CSV Server
 
 Start:
   start.bat
 
 Funktion:
-  - startet lokalen HTTP Server
-  - lädt web_ui/data/*.csv
-  - schreibt Änderungen zurück in CSV
-  - erstellt Backups unter web_ui/backups
+  - startet den lokalen Webserver fuer web_ui
+  - stellt /api/load, /api/save und /api/backup bereit
+  - laedt web_ui/data/*.csv mit Semikolon- oder Komma-Erkennung
+  - prueft Save-Payloads vor dem Schreiben auf Vollstaendigkeit
+  - erstellt vor jedem CSV-Schreibvorgang ein Backup unter web_ui/backups
 """
 
 from __future__ import annotations
@@ -52,6 +53,16 @@ DEFAULT_COLUMNS = {
     "tickets": ["Ticket-ID","Asset-ID","Gerätename","Titel","Kategorie","Priorität","Status","Tags","Ursache","Lösung","Knowledge-ID"],
     "notizen": ["Notiz-ID","Asset-ID","Gerätename","Titel","Kategorie","Status","Inhalt"],
     "knowledge": ["Knowledge-ID","Titel","Kategorie","Tags","Lösung"],
+}
+
+REQUIRED_FIELDS = {
+    "assets": ["Asset-ID", "Gerätename", "Asset-Typ", "Status"],
+    "hardware": ["Hardware-ID", "Asset-ID", "Gerätename"],
+    "software": ["Software-ID", "Asset-ID", "Gerätename", "Softwarename"],
+    "netzwerk": ["Netzwerk-ID", "Asset-ID", "Gerätename", "Netzwerktyp", "Adressart"],
+    "tickets": ["Ticket-ID", "Asset-ID", "Gerätename", "Titel", "Status"],
+    "notizen": ["Notiz-ID", "Asset-ID", "Gerätename", "Titel"],
+    "knowledge": ["Knowledge-ID", "Titel", "Lösung"],
 }
 
 def ensure_dirs() -> None:
@@ -122,13 +133,37 @@ def backup_all() -> Path:
             shutil.copy2(src, target / filename)
     return target
 
-def save_all(payload: dict[str, object]) -> None:
-    ensure_dirs()
-    backup_all()
-    for key in TABLE_FILES:
+def validate_payload(payload: dict[str, object]) -> None:
+    missing = [key for key in TABLE_FILES if key not in payload]
+    invalid = [key for key in TABLE_FILES if key in payload and not isinstance(payload[key], list)]
+    if missing:
+        raise ValueError("Payload unvollständig. Fehlende Tabellen: " + ", ".join(missing))
+    if invalid:
+        raise ValueError("Payload ungültig. Tabellen müssen Listen sein: " + ", ".join(invalid))
+    field_errors: list[str] = []
+    for key, required_fields in REQUIRED_FIELDS.items():
         rows = payload.get(key, [])
         if not isinstance(rows, list):
-            rows = []
+            continue
+        for index, row in enumerate(rows, start=1):
+            if not isinstance(row, dict):
+                field_errors.append(f"{key}[{index}] ist kein Objekt")
+                continue
+            missing_fields = [
+                field for field in required_fields
+                if not str(row.get(field, "")).strip()
+            ]
+            if missing_fields:
+                field_errors.append(f"{key}[{index}]: " + ", ".join(missing_fields))
+    if field_errors:
+        raise ValueError("Pflichtfelder fehlen: " + "; ".join(field_errors[:20]))
+
+def save_all(payload: dict[str, object]) -> None:
+    ensure_dirs()
+    validate_payload(payload)
+    backup_all()
+    for key in TABLE_FILES:
+        rows = payload[key]
         write_csv_table(key, rows)  # type: ignore[arg-type]
 
 class Handler(SimpleHTTPRequestHandler):
@@ -193,19 +228,29 @@ def main() -> None:
     port = find_free_port(PREFERRED_PORT)
     url = f"http://localhost:{port}"
     print("")
-    print("IT-Verwaltung Bootstrap v20 - CSV Persistenz")
+    print("IT-Verwaltung v43 - Safety Guard CSV Server")
     print(f"Projekt: {PROJECT_ROOT}")
     print(f"Web:     {WEB_ROOT}")
     print(f"CSV:     {DATA_DIR}")
     print(f"Backup:  {BACKUP_DIR}")
     print(f"URL:     {url}")
     print("")
+    print("API:")
+    print("  GET  /api/load    CSV-Daten laden")
+    print("  POST /api/save    CSV-Daten nach Payload-Pruefung speichern")
+    print("  POST /api/backup  CSV-Ordner-Backup erstellen")
+    print("")
+    print("Schutz:")
+    print("  - Save nur mit vollstaendigen Tabellen")
+    print("  - Backup vor jedem CSV-Schreibvorgang")
+    print("  - Zugriff nur lokal auf 127.0.0.1")
+    print("")
     try:
         webbrowser.open(url)
     except Exception:
         pass
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print("Server läuft. Beenden mit STRG+C.")
+    print("Server laeuft. Beenden mit STRG+C.")
     server.serve_forever()
 
 if __name__ == "__main__":

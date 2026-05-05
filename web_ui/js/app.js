@@ -1,16 +1,3 @@
-
-function renderSoftwareStatus(assetId){
-  return (DB.stammdaten.software || []).map(sw=>{
-    const installed = CORE.isSoftwareInstalled(assetId, sw.name);
-    let badge = installed ? '<span class="badge bg-success ms-2">✔</span>' :
-                sw.required ? '<span class="badge bg-danger ms-2">Pflicht fehlt</span>' :
-                '<span class="badge bg-warning ms-2">Fehlt</span>';
-
-    return `<div>${sw.name} ${badge}</div>`;
-  }).join("");
-}
-
-
 // ===== v35 UI ENGINE =====
 const UI = {
   speed: 160,
@@ -25,37 +12,46 @@ const UI = {
   }
 };
 
-$(document).on('mouseenter', '.card', function(){
-  $(this).addClass('shadow-lg').css('transform','translateY(-4px)');
-});
-$(document).on('mouseleave', '.card', function(){
-  $(this).removeClass('shadow-lg').css('transform','translateY(0)');
-});
+function bindUiChromeEvents(){
+  if(!window.jQuery) return;
+  $(document).on('mouseenter', '.card', function(){
+    $(this).addClass('shadow-lg').css('transform','translateY(-4px)');
+  });
+  $(document).on('mouseleave', '.card', function(){
+    $(this).removeClass('shadow-lg').css('transform','translateY(0)');
+  });
+  $(document).on('click', '.btn', function(){
+    const b = $(this);
+    b.css('transform','scale(0.95)');
+    setTimeout(function(){ b.css('transform','scale(1)'); }, 120);
+  });
+  $('#editModal, #deviceWizardModal').on('hidden.bs.modal', function () {
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  });
+}
 
-$(document).on('click', '.btn', function(){
-  const b = $(this);
-  b.css('transform','scale(0.95)');
-  setTimeout(function(){ b.css('transform','scale(1)'); }, 120);
-});
+document.addEventListener('DOMContentLoaded', bindUiChromeEvents, {once:true});
 
+const ID_PREFIXES = {
+  assets:'AS-',
+  hardware:'HW-',
+  software:'SW-',
+  netzwerk:'NET-',
+  tickets:'TIC-',
+  notizen:'NOTE-',
+  knowledge:'KB-'
+};
+const ID_COLUMNS = ['Asset-ID','Hardware-ID','Software-ID','Netzwerk-ID','Ticket-ID','Notiz-ID','Knowledge-ID'];
+const LEGACY_ID_PATTERN = /^(AS|HW|SW|NET|TIC|NOTE|KB)-\d{4}-(\d+)$/;
 
-document.addEventListener('DOMContentLoaded', function(){
-  if(window.jQuery){
-    $('#editModal, #deviceWizardModal').on('hidden.bs.modal', function () {
-      if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    });
-  }
-});
-
-
-const SEED = {"assets": [{"Asset-ID": "AS-2026-0001", "Gerätename": "EAH-BIB-PC-001", "Asset-Typ": "PC", "Standort": "Bibliothek", "Raum": "05.00.060", "Status": "Aktiv", "Hauptnutzer": "Max Mustermann", "Hersteller": "Dell", "Modell": "OptiPlex 7010", "Seriennummer": "SN-PC-001", "Inventarnummer": "INV-1001", "Betriebssystem": "Windows 11", "Domäne": "EAH", "Notizen": "Standardarbeitsplatz Ausleihe"}, {"Asset-ID": "AS-2026-0002", "Gerätename": "EAH-BIB-DR-004", "Asset-Typ": "Drucker", "Standort": "Bibliothek", "Raum": "05.00.061", "Status": "Aktiv", "Hauptnutzer": "Team Bibliothek", "Hersteller": "Kyocera", "Modell": "TASKalfa 2554ci", "Seriennummer": "SN-DR-004", "Inventarnummer": "INV-1004", "Betriebssystem": "Embedded", "Domäne": "-", "Notizen": "Zentraler Drucker Sekretariat"}], "hardware": [{"Hardware-ID": "HW-2026-0001", "Asset-ID": "AS-2026-0001", "Gerätename": "EAH-BIB-PC-001", "CPU": "Intel Core i5-13500", "RAM": "16 GB DDR4", "Speicher": "512 GB NVMe SSD", "Monitor": "2x Dell P2422H", "Dockingstation": "Keine", "Garantie bis": "31.12.2028", "Bemerkung": "Dual-Monitor Arbeitsplatz"}, {"Hardware-ID": "HW-2026-0002", "Asset-ID": "AS-2026-0002", "Gerätename": "EAH-BIB-DR-004", "CPU": "Embedded", "RAM": "4 GB", "Speicher": "32 GB Flash", "Monitor": "-", "Dockingstation": "-", "Garantie bis": "31.12.2026", "Bemerkung": "Drucker"}], "netzwerk": [{"Netzwerk-ID": "NET-2026-0001", "Asset-ID": "AS-2026-0001", "Gerätename": "EAH-BIB-PC-001", "Netzwerktyp": "LAN", "Adressart": "DHCP", "Verbindungstyp": "LAN direkt Wanddose", "IP-Adresse": "", "MAC-Adresse": "00:11:22:33:44:01", "DNS": "EAH-BIB-PC-001.eah.local", "VLAN": "120", "Switch-Port": "SW-BIB-01 / Port 12", "Wanddose": "D-05.00.060-01", "Access Point": "-", "SSID": "-", "Bemerkung": "Patchkabel geprüft"}, {"Netzwerk-ID": "NET-2026-0002", "Asset-ID": "AS-2026-0002", "Gerätename": "EAH-BIB-DR-004", "Netzwerktyp": "LAN", "Adressart": "Statisch", "Verbindungstyp": "LAN direkt Wanddose", "IP-Adresse": "10.20.30.40", "MAC-Adresse": "00:11:22:33:44:04", "DNS": "drucker-bib.eah.local", "VLAN": "120", "Switch-Port": "SW-BIB-01 / Port 24", "Wanddose": "D-05.00.061-01", "Access Point": "-", "SSID": "-", "Bemerkung": "Feste Drucker-IP"}], "software": [{"Software-ID": "SW-2026-0001", "Asset-ID": "AS-2026-0001", "Gerätename": "EAH-BIB-PC-001", "Softwarename": "Microsoft Office", "Version": "2021", "Hersteller": "Microsoft", "Lizenzstatus": "Aktiv", "Update-Status": "Aktuell", "Kritikalität": "Mittel", "Bemerkung": "Standard Office"}], "tickets": [{"Ticket-ID": "TIC-2026-0001", "Asset-ID": "AS-2026-0001", "Gerätename": "EAH-BIB-PC-001", "Titel": "Kein Internet am PC", "Kategorie": "Netzwerk", "Priorität": "Normal", "Status": "Gelöst", "Tags": "netzwerk;lan;wanddose", "Ursache": "Patchkabel defekt", "Lösung": "Patchkabel getauscht und Link geprüft", "Knowledge-ID": "KB-2026-0001"}, {"Ticket-ID": "TIC-2026-0002", "Asset-ID": "AS-2026-0002", "Gerätename": "EAH-BIB-DR-004", "Titel": "Drucker druckt nicht", "Kategorie": "Drucker", "Priorität": "Hoch", "Status": "Offen", "Tags": "drucker;treiber", "Ursache": "", "Lösung": "", "Knowledge-ID": ""}], "notizen": [{"Notiz-ID": "NOTE-2026-0001", "Asset-ID": "AS-2026-0001", "Gerätename": "EAH-BIB-PC-001", "Titel": "Arbeitsplatz Ausleihe", "Kategorie": "Betrieb", "Status": "Aktiv", "Inhalt": "Standardarbeitsplatz mit zwei Monitoren."}], "knowledge": [{"Knowledge-ID": "KB-2026-0001", "Titel": "LAN-Verbindung fehlt", "Kategorie": "Netzwerk", "Tags": "netzwerk;lan;wanddose", "Lösung": "Patchkabel, Switch-Port und DNS prüfen."}]};
+const SEED = {"assets": [{"Asset-ID": "AS-0001", "Gerätename": "EAH-BIB-PC-001", "Asset-Typ": "PC", "Standort": "Bibliothek", "Raum": "05.00.060", "Status": "Aktiv", "Hauptnutzer": "Max Mustermann", "Hersteller": "Dell", "Modell": "OptiPlex 7010", "Seriennummer": "SN-PC-001", "Inventarnummer": "INV-1001", "Betriebssystem": "Windows 11", "Domäne": "EAH", "Notizen": "Standardarbeitsplatz Ausleihe"}, {"Asset-ID": "AS-0002", "Gerätename": "EAH-BIB-DR-004", "Asset-Typ": "Drucker", "Standort": "Bibliothek", "Raum": "05.00.061", "Status": "Aktiv", "Hauptnutzer": "Team Bibliothek", "Hersteller": "Kyocera", "Modell": "TASKalfa 2554ci", "Seriennummer": "SN-DR-004", "Inventarnummer": "INV-1004", "Betriebssystem": "Embedded", "Domäne": "-", "Notizen": "Zentraler Drucker Sekretariat"}], "hardware": [{"Hardware-ID": "HW-0001", "Asset-ID": "AS-0001", "Gerätename": "EAH-BIB-PC-001", "CPU": "Intel Core i5-13500", "RAM": "16 GB DDR4", "Speicher": "512 GB NVMe SSD", "Monitor": "2x Dell P2422H", "Dockingstation": "Keine", "Garantie bis": "31.12.2028", "Bemerkung": "Dual-Monitor Arbeitsplatz"}, {"Hardware-ID": "HW-0002", "Asset-ID": "AS-0002", "Gerätename": "EAH-BIB-DR-004", "CPU": "Embedded", "RAM": "4 GB", "Speicher": "32 GB Flash", "Monitor": "-", "Dockingstation": "-", "Garantie bis": "31.12.2026", "Bemerkung": "Drucker"}], "netzwerk": [{"Netzwerk-ID": "NET-0001", "Asset-ID": "AS-0001", "Gerätename": "EAH-BIB-PC-001", "Netzwerktyp": "LAN", "Adressart": "DHCP", "Verbindungstyp": "LAN direkt Wanddose", "IP-Adresse": "", "MAC-Adresse": "00:11:22:33:44:01", "DNS": "EAH-BIB-PC-001.eah.local", "VLAN": "120", "Switch-Port": "SW-BIB-01 / Port 12", "Wanddose": "D-05.00.060-01", "Access Point": "-", "SSID": "-", "Bemerkung": "Patchkabel geprüft"}, {"Netzwerk-ID": "NET-0002", "Asset-ID": "AS-0002", "Gerätename": "EAH-BIB-DR-004", "Netzwerktyp": "LAN", "Adressart": "Statisch", "Verbindungstyp": "LAN direkt Wanddose", "IP-Adresse": "10.20.30.40", "MAC-Adresse": "00:11:22:33:44:04", "DNS": "drucker-bib.eah.local", "VLAN": "120", "Switch-Port": "SW-BIB-01 / Port 24", "Wanddose": "D-05.00.061-01", "Access Point": "-", "SSID": "-", "Bemerkung": "Feste Drucker-IP"}], "software": [{"Software-ID": "SW-0001", "Asset-ID": "AS-0001", "Gerätename": "EAH-BIB-PC-001", "Softwarename": "Microsoft Office", "Version": "2021", "Hersteller": "Microsoft", "Lizenzstatus": "Aktiv", "Update-Status": "Aktuell", "Kritikalität": "Mittel", "Bemerkung": "Standard Office"}], "tickets": [{"Ticket-ID": "TIC-0001", "Asset-ID": "AS-0001", "Gerätename": "EAH-BIB-PC-001", "Titel": "Kein Internet am PC", "Kategorie": "Netzwerk", "Priorität": "Normal", "Status": "Gelöst", "Tags": "netzwerk;lan;wanddose", "Ursache": "Patchkabel defekt", "Lösung": "Patchkabel getauscht und Link geprüft", "Knowledge-ID": "KB-0001"}, {"Ticket-ID": "TIC-0002", "Asset-ID": "AS-0002", "Gerätename": "EAH-BIB-DR-004", "Titel": "Drucker druckt nicht", "Kategorie": "Drucker", "Priorität": "Hoch", "Status": "Offen", "Tags": "drucker;treiber", "Ursache": "", "Lösung": "", "Knowledge-ID": ""}], "notizen": [{"Notiz-ID": "NOTE-0001", "Asset-ID": "AS-0001", "Gerätename": "EAH-BIB-PC-001", "Titel": "Arbeitsplatz Ausleihe", "Kategorie": "Betrieb", "Status": "Aktiv", "Inhalt": "Standardarbeitsplatz mit zwei Monitoren."}], "knowledge": [{"Knowledge-ID": "KB-0001", "Titel": "LAN-Verbindung fehlt", "Kategorie": "Netzwerk", "Tags": "netzwerk;lan;wanddose", "Lösung": "Patchkabel, Switch-Port und DNS prüfen."}]};
 const STORAGE_KEY = 'itverwaltung-bootstrap-v7-conditional';
 let DB = loadDb();
 let CSV_BACKEND_AVAILABLE = false;
 
-// ===== v33 CLEAN CORE LAYER =====
+// ===== v43 CLEAN CORE LAYER =====
 const CORE = {
-  version: 'v33',
+  version: 'v43',
   findAsset: function(assetId){
     if(!window.DB && typeof DB === 'undefined') return null;
     if(!DB || !Array.isArray(DB.assets)) return null;
@@ -82,6 +78,30 @@ const CORE = {
       cur = cur[key];
     }
     cur[parts[parts.length-1]] = value;
+  },
+  ensureSmartSoftwareDefaults: function(){
+    if(typeof DB === 'undefined' || !DB) return;
+    if(!DB.stammdaten) DB.stammdaten = {};
+    if(!Array.isArray(DB.stammdaten.software)){
+      DB.stammdaten.software = [
+        {name:"Firefox", isStandard:true, required:false},
+        {name:"Chrome", isStandard:true, required:false},
+        {name:"Adobe Acrobat Reader", isStandard:true, required:true},
+        {name:"Microsoft Office", isStandard:true, required:true},
+        {name:"UniGet / WinGet", isStandard:true, required:false},
+        {name:"Visual C++ Redistributable", isStandard:true, required:true},
+        {name:".NET Runtime", isStandard:true, required:true},
+        {name:"VPN Client", isStandard:false, required:false}
+      ];
+    }
+  },
+  isSoftwareInstalled: function(assetId, name){
+    if(typeof DB === 'undefined' || !DB || !Array.isArray(DB.software)) return false;
+    const needle = String(name || '').toLowerCase();
+    return DB.software.some(s =>
+      String(s["Asset-ID"] || '') === String(assetId || '') &&
+      String(s["Softwarename"] || '').toLowerCase().includes(needle)
+    );
   }
 };
 
@@ -97,10 +117,16 @@ function getPath(obj, path, def){
 function setPath(obj, path, value){
   return CORE.setPath(obj, path, value);
 }
+function ensureSmartSoftwareDefaults(){
+  return CORE.ensureSmartSoftwareDefaults();
+}
+function isSoftwareInstalled(assetId, name){
+  return CORE.isSoftwareInstalled(assetId, name);
+}
 
 const APP_SETTINGS_KEY = 'itverwaltung-v25-settings';
 let APP_SETTINGS = loadAppSettings();
-let BUILD_INFO = {version:'v18.2', name:'View Fix + AutoStart', buildDate:'offline'};
+let BUILD_INFO = {version:null, name:null, buildDate:null, features:[], loaded:false, error:null};
 let STAMM = {};
 const STAMM_FILES = {
   assetTypen:'stammdaten_asset_typen.md', status:'stammdaten_status.md', standorte:'stammdaten_standorte.md',
@@ -247,13 +273,13 @@ function addModelSeriesForCurrentSelection(){
 const fieldStamm = {'Asset-Typ':'assetTypen','Status':'status','Standort':'standorte','Raum':'raeume','Hersteller':'hersteller','Betriebssystem':'betriebssysteme','Domäne':'domaenen','Netzwerktyp':'netzwerktypen','Adressart':'adressarten','Verbindungstyp':'verbindungstypen','VLAN':'vlans','Switch-Port':'switches','Access Point':'accesspoints','SSID':'ssids','Lizenzstatus':'lizenzstatus','Update-Status':'updateStatus','Kritikalität':'kritikalitaet','Kategorie':'ticketKategorien','Priorität':'prioritaeten','Tags':'tags'};
 const modules = [
   {key:'dashboard',title:'Dashboard',mode:'dashboard',editable:false,group:'main'},
-  {key:'assets',title:'Assets',mode:'asset',id:'Asset-ID',prefix:'AS-2026-',editable:true,group:'main'},
-  {key:'hardware',title:'Hardware',mode:'module',id:'Hardware-ID',prefix:'HW-2026-',editable:true,group:'main',context:'hardware'},
-  {key:'software',title:'Software',mode:'module',id:'Software-ID',prefix:'SW-2026-',editable:true,group:'main',context:'software'},
-  {key:'netzwerk',title:'Netzwerk',mode:'module',id:'Netzwerk-ID',prefix:'NET-2026-',editable:true,group:'main',context:'network'},
-  {key:'tickets',title:'Tickets',mode:'module',id:'Ticket-ID',prefix:'TIC-2026-',editable:true,group:'support'},
-  {key:'notizen',title:'Notizen',mode:'module',id:'Notiz-ID',prefix:'NOTE-2026-',editable:true,group:'support'},
-  {key:'knowledge',title:'Knowledge',mode:'simple',id:'Knowledge-ID',prefix:'KB-2026-',editable:true,group:'support'},
+  {key:'assets',title:'Assets',mode:'asset',id:'Asset-ID',prefix:ID_PREFIXES.assets,editable:true,group:'main'},
+  {key:'hardware',title:'Hardware',mode:'module',id:'Hardware-ID',prefix:ID_PREFIXES.hardware,editable:true,group:'main',context:'hardware'},
+  {key:'software',title:'Software',mode:'module',id:'Software-ID',prefix:ID_PREFIXES.software,editable:true,group:'main',context:'software'},
+  {key:'netzwerk',title:'Netzwerk',mode:'module',id:'Netzwerk-ID',prefix:ID_PREFIXES.netzwerk,editable:true,group:'main',context:'network'},
+  {key:'tickets',title:'Tickets',mode:'module',id:'Ticket-ID',prefix:ID_PREFIXES.tickets,editable:true,group:'support'},
+  {key:'notizen',title:'Notizen',mode:'module',id:'Notiz-ID',prefix:ID_PREFIXES.notizen,editable:true,group:'support'},
+  {key:'knowledge',title:'Knowledge',mode:'simple',id:'Knowledge-ID',prefix:ID_PREFIXES.knowledge,editable:true,group:'support'},
   {key:'adminpanel',title:'Admin Panel',mode:'adminpanel',editable:false,group:'admin'},
   {key:'stammdaten',title:'Stammdaten',mode:'stammdaten',editable:false,group:'admin'}
 ];
@@ -263,7 +289,26 @@ let modalState={key:null,index:null,mode:null}, wizard={step:0,data:null};
 function parseMdList(text){return text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.startsWith('- ')).map(l=>l.replace(/^- /,'').trim()).filter(Boolean);}
 async function loadStammdaten(){STAMM={};for(const [key,file] of Object.entries(STAMM_FILES)){try{const txt=await fetch('stammdaten/'+file+'?v='+Date.now()).then(r=>{if(!r.ok)throw new Error();return r.text();});STAMM[key]=parseMdList(txt);}catch{STAMM[key]=FALLBACK_STAMM[key]||[];}}}
 async function reloadStammdaten(){await loadStammdaten();render();toast('Stammdaten neu geladen.');}
-function loadDb(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||structuredClone(SEED);}catch{return structuredClone(SEED);}}
+function normalizeIdValue(value){
+  const text = String(value || '');
+  const match = text.match(LEGACY_ID_PATTERN);
+  if(!match) return value;
+  return match[1] + '-' + String(match[2]).padStart(4, '0');
+}
+function normalizeDbIds(db){
+  if(!db || typeof db !== 'object') return db;
+  ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'].forEach(key=>{
+    if(!Array.isArray(db[key])) return;
+    db[key].forEach(row=>{
+      if(!row || typeof row !== 'object') return;
+      ID_COLUMNS.forEach(col=>{
+        if(row[col]) row[col] = normalizeIdValue(row[col]);
+      });
+    });
+  });
+  return db;
+}
+function loadDb(){try{return normalizeDbIds(JSON.parse(localStorage.getItem(STORAGE_KEY))||structuredClone(SEED));}catch{return normalizeDbIds(structuredClone(SEED));}}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(DB));}
 function val(row,key,fallback='-'){return row&&row[key]?row[key]:fallback;}
 function byAsset(key,id){return (DB[key]||[]).filter(x=>x['Asset-ID']===id);}
@@ -277,11 +322,55 @@ function deviceCode(type){return {'PC':'PC','Notebook':'NB','Thin Client':'IGEL'
 function nextDeviceName(type,bereich='BIB'){return `EAH-${bereich}-${deviceCode(type)}-${(DB.assets.length+1).toString().padStart(3,'0')}`;}
 function clearSearch(){document.getElementById('globalSearch').value='';searchText='';render();}
 function toast(msg){const t=document.getElementById('toast');t.innerHTML=`<div class="alert alert-success shadow">${msg}</div>`;setTimeout(()=>t.innerHTML='',1800);}
+function safetyConfirm(action, detail=''){
+  const text = detail ? `${action}\n\n${detail}` : action;
+  return confirm(`${text}\n\nFortfahren?`);
+}
+const REQUIRED_FIELDS = {
+  assets:['Asset-ID','Gerätename','Asset-Typ','Status'],
+  hardware:['Hardware-ID','Asset-ID','Gerätename'],
+  software:['Software-ID','Asset-ID','Gerätename','Softwarename'],
+  netzwerk:['Netzwerk-ID','Asset-ID','Gerätename','Netzwerktyp','Adressart'],
+  tickets:['Ticket-ID','Asset-ID','Gerätename','Titel','Status'],
+  notizen:['Notiz-ID','Asset-ID','Gerätename','Titel'],
+  knowledge:['Knowledge-ID','Titel','Lösung']
+};
+function validateDbBeforeWrite(){
+  const required = ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'];
+  const missing = required.filter(k=>!Array.isArray(DB[k]));
+  if(missing.length){
+    return {ok:false, message:'Fehlende oder ungueltige Tabellen: ' + missing.join(', ')};
+  }
+  const fieldErrors = [];
+  Object.entries(REQUIRED_FIELDS).forEach(([table, fields])=>{
+    (DB[table] || []).forEach((row, index)=>{
+      const missingFields = fields.filter(field=>!String(row?.[field] || '').trim());
+      if(missingFields.length){
+        fieldErrors.push(`${table}[${index + 1}]: ${missingFields.join(', ')}`);
+      }
+    });
+  });
+  if(fieldErrors.length){
+    return {ok:false, message:'Pflichtfelder fehlen: ' + fieldErrors.slice(0, 20).join('; ')};
+  }
+  return {ok:true, message:''};
+}
 async function loadBuildInfo(){
   try{
-    BUILD_INFO = await fetch('build-info.json?v=' + Date.now()).then(r=>r.json());
-  }catch{
-    BUILD_INFO = {version:'v18.2', name:'View Fix + AutoStart', buildDate:'offline'};
+    const data = await fetch('build-info.json?v=' + Date.now()).then(r=>{
+      if(!r.ok) throw new Error('build-info.json konnte nicht geladen werden.');
+      return r.json();
+    });
+    BUILD_INFO = {
+      version: data.version || null,
+      name: data.name || null,
+      buildDate: data.buildDate || null,
+      features: Array.isArray(data.features) ? data.features : [],
+      loaded: true,
+      error: null
+    };
+  }catch(e){
+    BUILD_INFO = {version:null, name:null, buildDate:null, features:[], loaded:false, error:e.message};
   }
 }
 
@@ -293,6 +382,7 @@ async function loadDbFromServer(){
     ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'].forEach(k=>{
       if(Array.isArray(data[k])) DB[k] = data[k];
     });
+    normalizeDbIds(DB);
     CSV_BACKEND_AVAILABLE = true;
     return true;
   }catch(e){
@@ -307,8 +397,13 @@ function maybeSaveDbToServer(){
   return Promise.resolve(false);
 }
 
-async function saveDbToServer(){
+async function saveDbToServer(manual=false){
   try{
+    const check = validateDbBeforeWrite();
+    if(!check.ok) throw new Error(check.message);
+    if(manual && !safetyConfirm('CSV-Dateien jetzt speichern?', 'Vor dem Schreiben erstellt der Server automatisch ein Backup.')){
+      return false;
+    }
     const res = await fetch('/api/save', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -334,11 +429,16 @@ async function saveDbToServer(){
 
 async function backupCsvServer(){
   try{
+    if(!safetyConfirm('CSV-Ordner-Backup erstellen?', 'Es werden Kopien der aktuellen CSV-Dateien unter web_ui/backups abgelegt.')){
+      return false;
+    }
     const res = await fetch('/api/backup', {method:'POST'});
     if(!res.ok) throw new Error(await res.text());
     toast('CSV-Backup erstellt.');
+    return true;
   }catch(e){
     alert('Backup nicht möglich:\n' + e.message);
+    return false;
   }
 }
 function csvStatusBadge(){
@@ -398,33 +498,7 @@ function safeSave(fn){
 }
 
 
-// ===== v40 SAFE SMART SOFTWARE LAYER =====
-function ensureSmartSoftwareDefaults(){
-  if(typeof DB === 'undefined' || !DB) return;
-  if(!DB.stammdaten) DB.stammdaten = {};
-  if(!Array.isArray(DB.stammdaten.software)){
-    DB.stammdaten.software = [
-      {name:"Firefox", isStandard:true, required:false},
-      {name:"Chrome", isStandard:true, required:false},
-      {name:"Adobe Acrobat Reader", isStandard:true, required:true},
-      {name:"Microsoft Office", isStandard:true, required:true},
-      {name:"UniGet / WinGet", isStandard:true, required:false},
-      {name:"Visual C++ Redistributable", isStandard:true, required:true},
-      {name:".NET Runtime", isStandard:true, required:true},
-      {name:"VPN Client", isStandard:false, required:false}
-    ];
-  }
-}
-
-function isSoftwareInstalled(assetId, name){
-  if(typeof DB === 'undefined' || !DB || !Array.isArray(DB.software)) return false;
-  const needle = String(name || '').toLowerCase();
-  return DB.software.some(s => 
-    String(s["Asset-ID"] || '') === String(assetId || '') &&
-    String(s["Softwarename"] || '').toLowerCase().includes(needle)
-  );
-}
-
+// ===== v43 SAFE SMART SOFTWARE LAYER =====
 function renderSoftwareStatus(assetId){
   ensureSmartSoftwareDefaults();
   if(typeof DB === 'undefined' || !DB || !DB.stammdaten || !Array.isArray(DB.stammdaten.software)) return "";
@@ -468,15 +542,16 @@ function renderBuildInfoCard(){
   return `<div class="card mt-3 build-info-card">
     <div class="card-header d-flex justify-content-between align-items-center">
       <span>Build Info</span>
-      <span class="badge text-bg-primary">${BUILD_INFO.version || 'v18.2'}</span>
+      <span class="badge text-bg-${BUILD_INFO.loaded ? 'primary' : 'warning'}">${BUILD_INFO.version || 'nicht geladen'}</span>
     </div>
     <div class="card-body">
       <div class="row g-2">
-        <div class="col-md-3"><b>Version</b><br>${BUILD_INFO.version || 'v18.2'}</div>
+        <div class="col-md-3"><b>Version</b><br>${BUILD_INFO.version || '-'}</div>
         <div class="col-md-3"><b>Name</b><br>${BUILD_INFO.name || '-'}</div>
         <div class="col-md-3"><b>Build</b><br>${BUILD_INFO.buildDate || '-'}</div>
         <div class="col-md-3"><b>Start</b><br>start.bat / app_server.py</div>
       </div>
+      ${BUILD_INFO.error ? `<div class="alert alert-warning mt-3 mb-0">${escapeHtml(BUILD_INFO.error)}</div>` : ''}
     </div>
   </div>`;
 }
@@ -515,7 +590,7 @@ function generateRandomTickets(){
   (DB.assets||[]).forEach(a=>{
     if(Math.random()>.6){
       DB.tickets.push({
-        'Ticket-ID':'AUTO-'+Math.random().toString(36).substr(2,5),
+        'Ticket-ID':nextId('tickets','Ticket-ID',ID_PREFIXES.tickets),
         'Asset-ID':a['Asset-ID'],
         'Gerätename':a['Gerätename'],
         'Titel':problems[Math.floor(Math.random()*problems.length)],
@@ -690,7 +765,7 @@ function createExportPayload(){
   return {
     meta:{
       app:'IT-Verwaltung',
-      version:(typeof BUILD_INFO !== 'undefined' && BUILD_INFO.version) ? BUILD_INFO.version : 'v31',
+      version:(typeof BUILD_INFO !== 'undefined' && BUILD_INFO.version) ? BUILD_INFO.version : 'unknown',
       exportedAt:new Date().toISOString(),
       format:'itverwaltung-full-backup-json-v1'
     },
@@ -707,6 +782,9 @@ function createExportPayload(){
 }
 
 function exportAllToOneFile(){
+  if(!safetyConfirm('Backup-Datei erstellen?', 'Alle Tabellen werden als JSON-Datei exportiert.')){
+    return;
+  }
   const payload = createExportPayload();
   const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
   const filename = `IT-Verwaltung_Backup_${stamp}.json`;
@@ -737,7 +815,7 @@ function importAllFromOneFile(){
         if(missing.length){
           throw new Error('Ungültige Backup-Datei. Fehlende Tabellen: ' + missing.join(', '));
         }
-        if(!confirm('Backup importieren und aktuelle Daten im Browser ersetzen?')){
+        if(!safetyConfirm('Backup importieren?', 'Aktuelle Browserdaten werden ersetzt und anschließend in CSV geschrieben.')){
           return;
         }
         keys.forEach(k=>DB[k] = data[k] || []);
@@ -767,7 +845,7 @@ function adminStoragePanel(){
         <button class="btn btn-success" onclick="exportAllToOneFile()">⬇ Alles als eine Datei sichern</button>
         <button class="btn btn-primary" onclick="exportNotionZip()">Notion Export ZIP</button>
         <button class="btn btn-outline-primary" onclick="importAllFromOneFile()">⬆ Eine Backup-Datei laden</button>
-        <button class="btn btn-outline-success" data-save-button="true" onclick="saveDbToServer()">CSV jetzt speichern</button>
+        <button class="btn btn-outline-success" data-save-button="true" onclick="saveDbToServer(true)">CSV jetzt speichern</button>
         <button class="btn btn-outline-secondary" onclick="backupCsvServer()">CSV-Ordner-Backup</button>
       </div>
       <div class="text-muted mt-2">
@@ -886,6 +964,9 @@ function downloadBlob(blob, filename){
 
 function exportNotionZip(){
   try{
+    if(!safetyConfirm('Notion Export ZIP erstellen?', 'Alle Tabellen werden als Notion-kompatible CSV-Dateien in eine ZIP geschrieben.')){
+      return;
+    }
     if(typeof JSZip === 'undefined'){
       alert('JSZip konnte nicht geladen werden. Bitte Internetverbindung/CDN prüfen oder lokale JSZip-Datei einbinden.');
       return;
@@ -914,7 +995,7 @@ function exportNotionZip(){
 }
 
 function renderAdminPanel(){
-  return `${adminStoragePanel()}<div class="row g-3">
+  return `${adminStoragePanel()}${renderBuildInfoCard()}<div class="row g-3">
     <div class="col-lg-5">
       <div class="card admin-card">
         <div class="card-header"><b>Darstellung</b></div>
@@ -933,10 +1014,9 @@ function renderAdminPanel(){
           ${adminSwitch('confirmDelete','Löschbestätigung','vor Löschvorgängen Sicherheitsabfrage anzeigen')}
           <hr>
           <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-success" data-save-button="true" onclick="saveDbToServer()">CSV jetzt speichern</button>
-            <button class="btn btn-outline-success" onclick="backupCsvServer()">Backup erstellen</button>
             <button class="btn btn-outline-primary" onclick="reloadStammdaten()">Stammdaten neu laden</button>
           </div>
+          <div class="text-muted mt-2">Backup, Import, Export und manuelles CSV-Speichern liegen ausschließlich im Bereich <b>Backup & Import</b>.</div>
         </div>
       </div>
     </div>
@@ -958,7 +1038,7 @@ function renderAdminPanel(){
         <div class="card-header"><b>System</b></div>
         <div class="card-body">
           <div class="kv">
-            ${kv('Version', BUILD_INFO.version || 'v25')}
+            ${kv('Version', BUILD_INFO.version || '-')}
             ${kv('Build', BUILD_INFO.buildDate || '-')}
             ${kv('CSV Backend', CSV_BACKEND_AVAILABLE ? 'aktiv' : 'nicht verbunden')}
             ${kv('Assets', DB.assets.length)}
@@ -976,11 +1056,6 @@ function adminSwitch(key,title,desc){
   </div>`;
 }
 
-
-if(typeof CORE !== 'undefined'){
-  CORE.isSoftwareInstalled = isSoftwareInstalled;
-  CORE.ensureSmartSoftwareDefaults = ensureSmartSoftwareDefaults;
-}
 
 function renderDashboardModeSwitch(){
   return `<div class="btn-group btn-group-sm" role="group">
@@ -1022,8 +1097,6 @@ function renderDashboard(){
     ${stat('Offene Tickets',DB.tickets.filter(t=>t.Status==='Offen').length,'danger')}
     ${stat('Gelöste Tickets',DB.tickets.filter(t=>t.Status==='Gelöst').length,'success')}
   </div>
-
-  ${renderBuildInfoCard()}
 
   <div class="card mt-3">
     <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -1259,6 +1332,10 @@ function contextHeader(mod){
 }
 
 function toolbar(mod,row,idx){
+  if(!row){
+    return `<div class="alert alert-info py-2 mb-2">Keine Treffer im aktuellen Tab.</div>`;
+  }
+
   // v14: Hardware darf nicht separat neu angelegt werden.
   // Hardware entsteht ausschließlich über den Wizard „+ Neues Gerät erfassen“.
   if(mod && mod.key === 'hardware'){
@@ -1299,7 +1376,7 @@ function renderAssets(){
   const rows = filterRows(DB.assets || []);
   const idx = clamp(selectedIndex.assets, rows.length);
   selectedIndex.assets = idx;
-  const row = rows[idx] || DB.assets[0];
+  const row = rows[idx] || null;
 
   const actions = row ? `
     <div class="alert alert-info py-2 mb-2">
@@ -1521,7 +1598,7 @@ function saveSoftwareProfile(){
   const asset = CORE.findAsset(assetId);
   document.querySelectorAll('.profileSoft:checked').forEach(el=>{
     DB.software.push({
-      'Software-ID': nextId('software','Software-ID','SW-2026-'),
+      'Software-ID': nextId('software','Software-ID',ID_PREFIXES.software),
       'Asset-ID': assetId,
       'Gerätename': asset?.['Gerätename'] || '',
       'Softwarename': el.dataset.name || el.value,
@@ -1541,9 +1618,9 @@ function saveSoftwareProfile(){
   toast('Standardsoftware hinzugefügt.');
 }
 
-function renderLinkedModule(mod){if(mod.key==='software')return renderSoftwareModern();const rows=filterRows(DB[mod.key]||[]);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||(DB[mod.key]||[])[0];return contextHeader(mod)+toolbar(mod,row,idx)+renderSplit(mod.key,rows,moduleColumns(mod.key),row,renderModuleCard(mod,row,idx,rows.length));}
-function renderSimpleModule(mod){const rows=filterRows(DB[mod.key]||[]);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||(DB[mod.key]||[])[0];return toolbar(mod,row,idx)+renderSplit(mod.key,rows,Object.keys((DB[mod.key]||[])[0]||{}).slice(0,6),row,renderGenericCard(mod,row,idx,rows.length));}
-function renderSplit(key,rows,cols,row,cardHtml){return `<div class="split"><div><div class="card"><div class="card-header">Liste</div><div class="card-body"><div class="table-wrap"><table class="table table-sm table-hover"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr class="${i===selectedIndex[key]?'active':''}" onclick="selectRow('${key}',${i})">${cols.map(c=>`<td>${val(r,c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div></div></div><div>${cardHtml}</div></div>`;}
+function renderLinkedModule(mod){if(mod.key==='software')return renderSoftwareModern();const rows=filterRows(DB[mod.key]||[]);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return contextHeader(mod)+toolbar(mod,row,idx)+renderSplit(mod.key,rows,moduleColumns(mod.key),row,renderModuleCard(mod,row,idx,rows.length));}
+function renderSimpleModule(mod){const rows=filterRows(DB[mod.key]||[]);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return toolbar(mod,row,idx)+renderSplit(mod.key,rows,Object.keys((DB[mod.key]||[])[0]||{}).slice(0,6),row,renderGenericCard(mod,row,idx,rows.length));}
+function renderSplit(key,rows,cols,row,cardHtml){const empty=rows.length===0?`<tr><td colspan="${Math.max(cols.length,1)}" class="text-muted">Keine Treffer</td></tr>`:'';return `<div class="split"><div><div class="card"><div class="card-header">Liste</div><div class="card-body"><div class="table-wrap"><table class="table table-sm table-hover"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${empty || rows.map((r,i)=>`<tr class="${i===selectedIndex[key]?'active':''}" onclick="selectRow('${key}',${i})">${cols.map(c=>`<td>${val(r,c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div></div></div><div>${cardHtml}</div></div>`;}
 function selectRow(key,idx){selectedIndex[key]=idx;render();} function prevRow(key){selectedIndex[key]--;render();} function nextRow(key){selectedIndex[key]++;render();}
 function nav(key,idx,total){return `<div class="card"><div class="card-body d-flex justify-content-between align-items-center"><button class="btn btn-outline-primary" onclick="prevRow('${key}')">←</button><b>${total?idx+1:0} / ${total}</b><button class="btn btn-outline-primary" onclick="nextRow('${key}')">→</button></div></div>`;}
 function assetColumns(){return ['Asset-ID','Gerätename','Asset-Typ','Standort','Status','Hauptnutzer','Inventarnummer'];}
@@ -1957,7 +2034,7 @@ function createKnowledgeForSoftware(title){
   if(!DB.knowledge) DB.knowledge = [];
   const existing = findKnowledgeByTitle(title);
   if(existing){ toast('Knowledge existiert bereits.'); renderWizard(); return; }
-  const id = nextId('knowledge','Knowledge-ID','KB-2026-');
+  const id = nextId('knowledge','Knowledge-ID',ID_PREFIXES.knowledge);
   DB.knowledge.push({
     'Knowledge-ID': id, 'Titel': title, 'Kategorie': 'Software',
     'Tags': 'adobe;zertifikat;signatur;software',
@@ -1976,7 +2053,7 @@ function smartSoftwareRowsForAsset(assetId, deviceName){
   profile.forEach(item=>{
     if(state[item.key]){
       rows.push({
-        'Software-ID': nextId('software','Software-ID','SW-2026-'),
+        'Software-ID': nextId('software','Software-ID',ID_PREFIXES.software),
         'Asset-ID': assetId, 'Gerätename': deviceName,
         'Softwarename': item.software, 'Version': '', 'Hersteller': item.vendor,
         'Lizenzstatus': item.key === 'office' ? (state.officeActivated ? 'Aktiv' : 'Prüfen') : 'Aktiv',
@@ -2310,7 +2387,41 @@ function wizardPreview(){
     ${validation.warnings.length ? `<div class="alert alert-warning mt-3"><b>Hinweise:</b><br>${validation.warnings.join('<br>')}</div>` : ''}`;
 }
 
-function wizardSave(){saveWizardFields();const validation=networkValidationMessages(wizard.data);if(validation.errors.length){alert('Speichern nicht möglich:\n\n'+validation.errors.join('\n'));uxShake('#wizardBody .form-control,#wizardBody .form-select');return;}const d=wizard.data, assetId=nextId('assets','Asset-ID','AS-2026-'), hwId=nextId('hardware','Hardware-ID','HW-2026-'), netId=nextId('netzwerk','Netzwerk-ID','NET-2026-'), noteId=nextId('notizen','Notiz-ID','NOTE-2026-'), name=nextDeviceName(wizard.data.type);DB.assets.push({'Asset-ID':assetId,'Gerätename':name,'Asset-Typ':wizard.data.type,'Standort':wizard.data.grund.Standort,'Raum':wizard.data.grund.Raum,'Status':wizard.data.grund.Status,'Hauptnutzer':wizard.data.grund.Hauptnutzer,'Hersteller':wizard.data.grund.Hersteller,'Modellserie':wizard.data.grund.Modellserie,'Modell':wizard.data.grund.Modell,'Seriennummer':wizard.data.grund.Seriennummer,'Inventarnummer':wizard.data.grund.Inventarnummer,'Betriebssystem':wizard.data.grund.Betriebssystem,'Domäne':wizard.data.grund.Domäne,'Notizen':wizard.data.grund.Notizen});DB.hardware.push({'Hardware-ID':hwId,'Asset-ID':assetId,'Gerätename':name,'CPU':wizard.data.hardware.CPU,'RAM':wizard.data.hardware.RAM,'Speicher':wizard.data.hardware.Speicher,'Monitor':wizard.data.hardware.Monitor,'Dockingstation':wizard.data.hardware.Dockingstation,'Garantie bis':wizard.data.hardware.GarantieBis,'Bemerkung':wizard.data.hardware.Bemerkung||wizard.data.hardware.Druckertyp||wizard.data.hardware.Controller});DB.netzwerk.push({'Netzwerk-ID':netId,'Asset-ID':assetId,'Gerätename':name,'Netzwerktyp':wizard.data.netzwerk.Netzwerktyp,'Adressart':wizard.data.netzwerk.Adressart,'Verbindungstyp':wizard.data.netzwerk.Verbindungstyp,'IP-Adresse':wizard.data.netzwerk['IP-Adresse'],'MAC-Adresse':wizard.data.netzwerk['MAC-Adresse'],'DNS':wizard.data.netzwerk.DNS,'VLAN':wizard.data.netzwerk.VLAN,'Switch-Port':wizard.data.netzwerk.SwitchPort,'Wanddose':wizard.data.netzwerk.Wanddose,'Access Point':wizard.data.netzwerk.AccessPoint,'SSID':wizard.data.netzwerk.SSID,'Bemerkung':wizard.data.netzwerk.Bemerkung});if(isComputeType(wizard.data.type)){wizard.data.software.forEach(line=>{const p=line.split(';');DB.software.push({'Software-ID':nextId('software','Software-ID','SW-2026-'),'Asset-ID':assetId,'Gerätename':name,'Softwarename':p[0]||line,'Version':p[1]||'','Hersteller':p[2]||'','Lizenzstatus':STAMM.lizenzstatus?.[0]||'Aktiv','Update-Status':STAMM.updateStatus?.[0]||'Prüfen','Kritikalität':STAMM.kritikalitaet?.[1]||'Normal','Bemerkung':'Aus Wizard erstellt'});});}DB.notizen.push({'Notiz-ID':noteId,'Asset-ID':assetId,'Gerätename':name,'Titel':'Geräteanlage','Kategorie':'Erfassung','Status':'Aktiv','Inhalt':'Über Wizard erfasst. '+(wizard.data.grund.Notizen||'')});persist();maybeSaveDbToServer();selectedIndex.assets=DB.assets.length-1;activeKey='assets';bootstrap.Modal.getInstance(document.getElementById('deviceWizardModal')).hide();renderAll();toast('Gerät vollständig erstellt.');}
+function wizardSave(){
+  try{
+    saveWizardFields();
+    const validation=networkValidationMessages(wizard.data);
+    if(validation.errors.length){
+      alert('Speichern nicht möglich:\n\n'+validation.errors.join('\n'));
+      uxShake('#wizardBody .form-control,#wizardBody .form-select');
+      return;
+    }
+    if(!safetyConfirm('Neues Gerät final erstellen?', 'Asset, Hardware, Netzwerk und Notiz werden angelegt.')){
+      return;
+    }
+    const d=wizard.data, assetId=nextId('assets','Asset-ID',ID_PREFIXES.assets), hwId=nextId('hardware','Hardware-ID',ID_PREFIXES.hardware), netId=nextId('netzwerk','Netzwerk-ID',ID_PREFIXES.netzwerk), noteId=nextId('notizen','Notiz-ID',ID_PREFIXES.notizen), name=nextDeviceName(wizard.data.type);
+    DB.assets.push({'Asset-ID':assetId,'Gerätename':name,'Asset-Typ':wizard.data.type,'Standort':wizard.data.grund.Standort,'Raum':wizard.data.grund.Raum,'Status':wizard.data.grund.Status,'Hauptnutzer':wizard.data.grund.Hauptnutzer,'Hersteller':wizard.data.grund.Hersteller,'Modellserie':wizard.data.grund.Modellserie,'Modell':wizard.data.grund.Modell,'Seriennummer':wizard.data.grund.Seriennummer,'Inventarnummer':wizard.data.grund.Inventarnummer,'Betriebssystem':wizard.data.grund.Betriebssystem,'Domäne':wizard.data.grund.Domäne,'Notizen':wizard.data.grund.Notizen});
+    DB.hardware.push({'Hardware-ID':hwId,'Asset-ID':assetId,'Gerätename':name,'CPU':wizard.data.hardware.CPU,'RAM':wizard.data.hardware.RAM,'Speicher':wizard.data.hardware.Speicher,'Monitor':wizard.data.hardware.Monitor,'Dockingstation':wizard.data.hardware.Dockingstation,'Garantie bis':wizard.data.hardware.GarantieBis,'Bemerkung':wizard.data.hardware.Bemerkung||wizard.data.hardware.Druckertyp||wizard.data.hardware.Controller});
+    DB.netzwerk.push({'Netzwerk-ID':netId,'Asset-ID':assetId,'Gerätename':name,'Netzwerktyp':wizard.data.netzwerk.Netzwerktyp,'Adressart':wizard.data.netzwerk.Adressart,'Verbindungstyp':wizard.data.netzwerk.Verbindungstyp,'IP-Adresse':wizard.data.netzwerk['IP-Adresse'],'MAC-Adresse':wizard.data.netzwerk['MAC-Adresse'],'DNS':wizard.data.netzwerk.DNS,'VLAN':wizard.data.netzwerk.VLAN,'Switch-Port':wizard.data.netzwerk.SwitchPort,'Wanddose':wizard.data.netzwerk.Wanddose,'Access Point':wizard.data.netzwerk.AccessPoint,'SSID':wizard.data.netzwerk.SSID,'Bemerkung':wizard.data.netzwerk.Bemerkung});
+    if(isComputeType(wizard.data.type)){
+      wizard.data.software.forEach(line=>{
+        const p=line.split(';');
+        DB.software.push({'Software-ID':nextId('software','Software-ID',ID_PREFIXES.software),'Asset-ID':assetId,'Gerätename':name,'Softwarename':p[0]||line,'Version':p[1]||'','Hersteller':p[2]||'','Lizenzstatus':STAMM.lizenzstatus?.[0]||'Aktiv','Update-Status':STAMM.updateStatus?.[0]||'Prüfen','Kritikalität':STAMM.kritikalitaet?.[1]||'Normal','Bemerkung':'Aus Wizard erstellt'});
+      });
+    }
+    DB.notizen.push({'Notiz-ID':noteId,'Asset-ID':assetId,'Gerätename':name,'Titel':'Geräteanlage','Kategorie':'Erfassung','Status':'Aktiv','Inhalt':'Über Wizard erfasst. '+(wizard.data.grund.Notizen||'')});
+    persist();
+    maybeSaveDbToServer();
+    selectedIndex.assets=DB.assets.length-1;
+    activeKey='assets';
+    bootstrap.Modal.getInstance(document.getElementById('deviceWizardModal')).hide();
+    renderAll();
+    toast('Gerät vollständig erstellt.');
+  }catch(e){
+    console.error(e);
+    alert('Gerät konnte nicht erstellt werden:\n' + e.message);
+  }
+}
 
 
 // Referenzierte Erstellung: Hardware/Netzwerk/Software/Notizen werden gegen ein bestehendes Asset referenziert.
@@ -2547,18 +2658,81 @@ function autoFillNetwork(obj){
   return obj;
 }
 
-function saveModal(){applyEditLogic();const obj={};document.querySelectorAll('.edit-field').forEach(el=>{if(!el.disabled)obj[el.dataset.key]=el.value;else obj[el.dataset.key]=el.value;});if(isAssetLinkedModule(modalState.key)&&!obj['Asset-ID']){
-  alert('Bitte ein Asset auswählen.');
-  return;
+function saveModal(){
+  try{
+    applyEditLogic();
+    let obj={};
+    document.querySelectorAll('.edit-field').forEach(el=>{
+      obj[el.dataset.key]=el.value;
+    });
+    if(isAssetLinkedModule(modalState.key)&&!obj['Asset-ID']){
+      alert('Bitte ein Asset auswählen.');
+      return;
+    }
+    if(modalState.key==='netzwerk'){
+      if(!networkTypeMatchesConnection(obj['Netzwerktyp'], obj['Verbindungstyp'])){
+        alert('Netzwerktyp und Verbindungstyp passen nicht zusammen.');
+        return;
+      }
+      obj = autoFillNetwork(obj);
+      const check = networkValidationMessages(obj);
+      if(check.errors.length){
+        alert(check.errors.join('\n'));
+        return;
+      }
+    }
+    if(modalState.key==='netzwerk'&&obj.Adressart==='Statisch'&&!obj['IP-Adresse']){
+      alert('Bei statischer Adressierung ist eine IP-Adresse Pflicht.');
+      return;
+    }
+    if(modalState.key==='tickets'&&obj.Status==='Gelöst'&&(!obj.Ursache||!obj.Lösung)){
+      alert('Bei gelöstem Ticket sind Ursache und Lösung Pflicht.');
+      return;
+    }
+    const action = modalState.mode==='create' ? 'Eintrag anlegen?' : 'Änderungen speichern?';
+    const detail = `${getModuleLabel(modalState.key)}: ${obj['Gerätename'] || obj.Titel || obj[modules.find(m=>m.key===modalState.key)?.id] || ''}`;
+    if(!safetyConfirm(action, detail)){
+      return;
+    }
+    if(modalState.mode==='create'){
+      DB[modalState.key].push(obj);
+      selectedIndex[modalState.key]=DB[modalState.key].length-1;
+    }else{
+      DB[modalState.key][modalState.index]=obj;
+    }
+    persist();
+    maybeSaveDbToServer();
+    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+    render();
+    toast('Gespeichert.');
+  }catch(e){
+    console.error(e);
+    alert('Speichern fehlgeschlagen:\n' + e.message);
+  }
 }
-if(modalState.key==='netzwerk'){
-  if(!networkTypeMatchesConnection(obj['Netzwerktyp'], obj['Verbindungstyp'])){ alert('Netzwerktyp und Verbindungstyp passen nicht zusammen.'); return; }
-  obj = autoFillNetwork(obj);
-  const check = networkValidationMessages(obj);
-  if(check.errors.length){ alert(check.errors.join('\n')); return; }
-}if(modalState.key==='netzwerk'&&obj.Adressart==='Statisch'&&!obj['IP-Adresse']){alert('Bei statischer Adressierung ist eine IP-Adresse Pflicht.');return;}if(modalState.key==='tickets'&&obj.Status==='Gelöst'&&(!obj.Ursache||!obj.Lösung)){alert('Bei gelöstem Ticket sind Ursache und Lösung Pflicht.');return;}if(modalState.mode==='create'){DB[modalState.key].push(obj);selectedIndex[modalState.key]=DB[modalState.key].length-1;}else{DB[modalState.key][modalState.index]=obj;}persist();maybeSaveDbToServer();bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();render();toast('Gespeichert.');}
 function deleteRow(key,idx){const rows=filterRows(DB[key]||[]), row=rows[idx], realIdx=DB[key].indexOf(row);if(realIdx<0)return;if(!APP_SETTINGS.confirmDelete || confirm('Eintrag wirklich löschen?')){DB[key].splice(realIdx,1);selectedIndex[key]=0;persist();maybeSaveDbToServer();render();toast('Gelöscht.');}}
-function createKnowledgeFromTicket(idx){const rows=filterRows(DB.tickets), t=rows[idx];if(!t||t.Status!=='Gelöst'){alert('Knowledge kann erst aus gelöstem Ticket erstellt werden.');return;}const kbId=nextId('knowledge','Knowledge-ID','KB-2026-');DB.knowledge.push({'Knowledge-ID':kbId,'Titel':t.Titel,'Kategorie':t.Kategorie,'Tags':t.Tags,'Lösung':t.Lösung});t['Knowledge-ID']=kbId;persist();activeKey='knowledge';selectedIndex.knowledge=DB.knowledge.length-1;renderAll();toast('Knowledge aus Ticket erstellt.');}
-init();
+function createKnowledgeFromTicket(idx){const rows=filterRows(DB.tickets), t=rows[idx];if(!t||t.Status!=='Gelöst'){alert('Knowledge kann erst aus gelöstem Ticket erstellt werden.');return;}const kbId=nextId('knowledge','Knowledge-ID',ID_PREFIXES.knowledge);DB.knowledge.push({'Knowledge-ID':kbId,'Titel':t.Titel,'Kategorie':t.Kategorie,'Tags':t.Tags,'Lösung':t.Lösung});t['Knowledge-ID']=kbId;persist();activeKey='knowledge';selectedIndex.knowledge=DB.knowledge.length-1;renderAll();toast('Knowledge aus Ticket erstellt.');}
+
+function showStartupError(error){
+  console.error('APP START ERROR:', error);
+  const target = document.getElementById('tabContent') || document.body;
+  if(target){
+    target.innerHTML = `<div class="alert alert-danger m-3"><b>App konnte nicht gestartet werden.</b><br>${escapeHtml(error.message || error)}</div>`;
+  }
+}
+
+function startApp(){
+  const run = function(){
+    Promise.resolve(init()).catch(showStartupError);
+  };
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', run, {once:true});
+  }else{
+    run();
+  }
+}
+
+startApp();
 
 function OpenDeviceWizard(){ return openDeviceWizard(); }
+
