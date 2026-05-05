@@ -1,0 +1,2 @@
+﻿Netzwerk-ID;Asset-ID;Gerätename;Netzwerktyp;Adressart;Verbindungstyp;IP-Adresse;MAC-Adresse;DNS;VLAN;Switch-Port;Wanddose;Access Point;SSID;Bemerkung
+NET-0003;AS-0003;MARTIN;LAN/WLAN;DHCP;;192.168.1.71;7C:50:79:3F:93:73;192.168.1.1;;;;;;Automatisch erfasst. Verbindungstyp bitte prüfen.

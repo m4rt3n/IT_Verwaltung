@@ -1,0 +1,16 @@
+﻿[2026-05-05 20:53:52] [INFO] Scanner PRO gestartet
+[2026-05-05 20:53:52] [INFO] Backup erstellt: C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\backups\scanner_20260505_205352
+[2026-05-05 20:53:52] [WARN] CSV wird repariert: C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\assets.csv. Fehlende Spalten: Modellserie
+[2026-05-05 20:53:52] [WARN] CSV wird repariert: C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\assets.csv. Fehlende Spalten: Asset-ID, Gerätename, Asset-Typ, Standort, Raum, Status, Hauptnutzer, Hersteller, Modellserie, Modell, Seriennummer, Inventarnummer, Betriebssystem, Domäne, Notizen
+[2026-05-05 20:53:54] [WARN] Standardsoftware fehlt/nicht erkannt: Firefox
+[2026-05-05 20:53:54] [WARN] Standardsoftware fehlt/nicht erkannt: UniGet / WinGet
+[2026-05-05 20:53:54] [WARN] Standardsoftware fehlt/nicht erkannt: VPN Client
+[2026-05-05 20:53:54] [INFO] CSV geschrieben: C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\assets.csv (3 Zeilen)
+[2026-05-05 20:53:54] [INFO] CSV geschrieben: C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\hardware.csv (3 Zeilen)
+[2026-05-05 20:53:54] [INFO] CSV geschrieben: C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\netzwerk.csv (3 Zeilen)
+[2026-05-05 20:53:54] [INFO] CSV geschrieben: C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\software.csv (6 Zeilen)
+[2026-05-05 20:53:54] [ERROR] Validierung FEHLER
+[2026-05-05 20:53:54] [ERROR] Spalten fehlen in C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\assets.csv: Asset-ID, Gerätename
+[2026-05-05 20:53:54] [ERROR] Spalten fehlen in C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\hardware.csv: Hardware-ID, Asset-ID
+[2026-05-05 20:53:54] [ERROR] Spalten fehlen in C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\netzwerk.csv: Netzwerk-ID, Asset-ID
+[2026-05-05 20:53:54] [ERROR] Spalten fehlen in C:\Users\mguel\Downloads\IT_Verwaltung_Web_Bootstrap_v43_StableScanner\IT_Verwaltung_Web_Bootstrap_v7_ConditionalLogic\web_ui\data\software.csv: Software-ID, Asset-ID

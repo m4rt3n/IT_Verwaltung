@@ -1,0 +1,4 @@
+﻿"Asset-ID";"Gerätename";"Asset-Typ";"Standort";"Raum";"Status";"Hauptnutzer";"Hersteller";"Modellserie";"Modell";"Seriennummer";"Inventarnummer";"Betriebssystem";"Domäne";"Notizen"
+"AS-2026-0001";"EAH-BIB-PC-001";"PC";"Bibliothek";"05.00.060";"Aktiv";"Max Mustermann";"Dell";"";"OptiPlex 7010";"SN-PC-001";"INV-1001";"Windows 11";"EAH";"Standardarbeitsplatz Ausleihe"
+"AS-2026-0002";"EAH-BIB-DR-004";"Drucker";"Bibliothek";"05.00.061";"Aktiv";"Team Bibliothek";"Kyocera";"";"TASKalfa 2554ci";"SN-DR-004";"INV-1004";"Embedded";"-";"Zentraler Drucker Sekretariat"
+"AS-0003";"MARTIN";"Desktop";"";"";"Aktiv";"mguel";"To Be Filled By O.E.M.";"";"To Be Filled By O.E.M.";"To Be Filled By O.E.M.";"";"Microsoft Windows 11 Pro";"WORKGROUP";"Automatisch erfasst: 2026-05-05 20:53:54"

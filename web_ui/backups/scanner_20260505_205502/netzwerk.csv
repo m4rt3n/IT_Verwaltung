@@ -1,0 +1,4 @@
+﻿"Netzwerk-ID";"Asset-ID";"Gerätename";"Netzwerktyp";"Adressart";"Verbindungstyp";"IP-Adresse";"MAC-Adresse";"DNS";"VLAN";"Switch-Port";"Wanddose";"Access Point";"SSID";"Bemerkung"
+"NET-2026-0001";"AS-2026-0001";"EAH-BIB-PC-001";"LAN";"DHCP";"LAN direkt Wanddose";"";"00:11:22:33:44:01";"EAH-BIB-PC-001.eah.local";"120";"SW-BIB-01 / Port 12";"D-05.00.060-01";"-";"-";"Patchkabel geprüft"
+"NET-2026-0002";"AS-2026-0002";"EAH-BIB-DR-004";"LAN";"Statisch";"LAN direkt Wanddose";"10.20.30.40";"00:11:22:33:44:04";"drucker-bib.eah.local";"120";"SW-BIB-01 / Port 24";"D-05.00.061-01";"-";"-";"Feste Drucker-IP"
+"NET-0003";"AS-0003";"MARTIN";"LAN/WLAN";"DHCP";"";"192.168.1.71";"7C:50:79:3F:93:73";"192.168.1.1";"";"";"";"";"";"Automatisch erfasst. Verbindungstyp bitte prüfen."
