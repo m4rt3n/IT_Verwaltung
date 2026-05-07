@@ -1,8 +1,8 @@
 # IT-Verwaltung
 
-Lokale Web-App zur Verwaltung von IT-Assets, Hardware, Software, Netzwerkdaten, Tickets, Notizen und Knowledge-Einträgen.
+Lokale Windows-Web-App zur Verwaltung von IT-Assets, Hardware, Software, Netzwerkdaten, Tickets, Notizen und Knowledge-Einträgen.
 
-Die Anwendung läuft lokal auf Windows, nutzt CSV-Dateien als Datenbestand und bringt einen PowerShell-Hardware-Scanner mit.
+Die Anwendung bleibt bewusst einfach: ein lokaler Python-Server, CSV-Dateien als nachvollziehbarer Datenbestand und ein PowerShell-Hardware-Scanner.
 
 ## Start
 
@@ -10,90 +10,77 @@ Die Anwendung läuft lokal auf Windows, nutzt CSV-Dateien als Datenbestand und b
 start.bat
 ```
 
-Der Start öffnet einen lokalen Python-Webserver. Die App läuft standardmäßig ab Port `8765`; falls der Port belegt ist, sucht der Server automatisch den nächsten freien Port.
+`start.bat` fragt bei Bedarf per Windows-UAC Administratorrechte an. Der Webserver startet standardmäßig ab Port `8765` und sucht automatisch den nächsten freien Port, falls dieser belegt ist. Die Konsole zeigt immer die tatsaechliche `START-URL`; wenn `8765` belegt ist, steht dort der Ausweichport, z. B. `http://localhost:8766`.
 
-Wichtige Einstiege:
+Weitere Einstiege:
 
-- `start.bat`: Web-App starten
-- `Start-Web.bat` / `Start-Web.ps1`: alternative Web-Starts
-- `Start-HardwareScan.bat`: lokalen Hardware-Scan starten
-- `Start-HardwareScan-FullSoftware.bat`: Hardware-Scan mit vollständiger Softwareliste
-- `Check-HardwareScanner-Syntax.bat`: Scanner-Syntax prüfen, ohne Scan auszuführen
-- `Check-WebApp-Syntax.bat`: Python, Scanner und JavaScript-Syntax prüfen
+- `scripts/Start-Web.bat` / `scripts/Start-Web.ps1`: Web-App starten
+- `scripts/Start-HardwareScan.bat`: Hardware-, Asset- und Netzwerkdaten scannen
+- `scripts/Start-SoftwareScan.bat`: Standardsoftware separat scannen
+- `scripts/Start-SoftwareScan-Full.bat`: vollständige Softwareliste aus Registry, Appx/MSIX und Winget scannen, soweit lokal verfügbar
+- `scripts/Start-HardwareScan-FullSoftware.bat`: alter Kompatibilitätsalias für `scripts/Start-SoftwareScan-Full.bat`
+- `scripts/Check-HardwareScanner-Syntax.bat`: nur Scanner-Syntax prüfen, ohne Scan
+- `scripts/Check-WebApp-Syntax.bat`: Python-, PowerShell- und JavaScript-Syntax prüfen, soweit lokal verfügbar
 
-Details zu allen Startdateien stehen in [dokumentation/STARTDATEIEN.md](dokumentation/STARTDATEIEN.md).
-
-## Projektstruktur
+## Struktur
 
 ```text
-app_server.py                  Lokaler Python-CSV-Server
+app_server.py                  lokaler CSV-Webserver
 web_ui/index.html              Web-Oberfläche
 web_ui/js/app.js               App-Logik
 web_ui/css/app.css             Styling
-web_ui/data/*.csv              Produktive CSV-Daten
-web_ui/stammdaten/*.md         Auswahllisten/Stammdaten
+web_ui/data/*.csv              produktive CSV-Daten
+web_ui/stammdaten/*.md         Auswahllisten und Stammdaten
 tools/hardware_scanner/*.ps1   Windows-Hardware-Scanner
-dokumentation/                 Projektdokumentation
-planung/                       NEXT, TODO und Warteschlange
+scripts/*.bat, scripts/*.ps1   Hilfsstarts und Checks
+dokumentation/                 Projekt- und Build-Dokumentation
+planung/                       NEXT, TODO, Status und Warteschlange
 ```
 
 ## Daten und Backups
 
-Produktive Daten liegen unter `web_ui/data/`.
+Produktive Daten liegen in `web_ui/data/`.
 
-Der Server erstellt vor CSV-Schreibvorgängen automatisch ein Backup unter `web_ui/backups/`. Zusätzlich gibt es im Admin Panel:
+Der Server erstellt vor CSV-Schreibvorgängen ein Backup unter `web_ui/backups/`. Im Admin Panel sind die Aktionen fachlich getrennt:
 
-- JSON-Komplettbackup
-- JSON-Import
-- CSV jetzt speichern
-- CSV-Ordner-Backup
-- Notion Export ZIP
+- Datensicherung: JSON-Komplettbackup erstellen oder laden
+- Exporte: Notion Export ZIP
+- CSV-Wartung: CSV jetzt speichern oder CSV-Ordner-Backup erstellen
 
-`logs/`, `web_ui/backups/` und `web_ui/data/software_full.csv` sind lokale Laufzeitdaten und werden über `.gitignore` nicht versioniert. `software_full.csv` ist bewusst nur ein Scanner-Artefakt, keine produktive Web-App-Tabelle.
+`software_standard.csv` ist die produktive Tabelle für planbare Software. `software_full.csv` ist nur ein lokales Scanner-Artefakt für vollständige Softwareinventuren.
 
-## Sicherheitsregeln
+`logs/`, `web_ui/backups/` und `web_ui/data/software_full.csv` sind lokale Laufzeitdaten und werden nicht versioniert.
 
-- Manuelle Speicher-, Backup-, Export- und Anlagevorgänge fragen vor dem Schreiben nach.
-- Der Python-Server speichert nur vollständige Payloads mit allen erwarteten Tabellen.
-- Vor jedem CSV-Schreiben wird serverseitig ein Backup erstellt.
-- Der Scanner-Syntaxcheck muss über `Check-HardwareScanner-Syntax.bat` laufen, nicht über einen normalen Scanner-Start.
+## Scanner
+
+Die Scanner-Starts sind getrennt:
+
+```powershell
+scripts\Start-HardwareScan.bat
+scripts\Start-SoftwareScan.bat
+scripts\Start-SoftwareScan-Full.bat
+scripts\Check-HardwareScanner-Syntax.bat
+```
+
+Den Scanner nicht mit `-?` starten. Für reine Prüfung immer `scripts\Check-HardwareScanner-Syntax.bat` verwenden.
+
+## Entwicklerregeln
+
+- Für Codex und Agenten gilt zusätzlich [AGENTS.md](AGENTS.md) und [dokumentation/CODEX_ARBEITSKONZEPT.md](dokumentation/CODEX_ARBEITSKONZEPT.md).
 - Keine globalen Regex-Patches über große JavaScript-Blöcke.
-- Nach JavaScript-Änderungen soll `node --check web_ui/js/app.js` laufen, sobald Node.js verfügbar ist.
-- Nach Python-Änderungen:
+- Vor Codeänderungen die betroffene Funktion lesen.
+- Speicherfunktionen müssen vor dem Schreiben validieren.
+- Nach JavaScript-Änderungen `scripts\Check-WebApp-Syntax.bat` ausführen; der Check prüft alle produktiven Dateien unter `web_ui/js/`, sobald Node verfügbar ist.
+- Nach Python-Änderungen `python -m py_compile app_server.py` ausführen.
+- Gesamtcheck: `scripts\Check-WebApp-Syntax.bat`
 
-```powershell
-python -m py_compile app_server.py
-```
+Weitere Details:
 
-Gesammelter Check:
-
-```powershell
-Check-WebApp-Syntax.bat
-```
-
-Mehr Details stehen in [dokumentation/SICHERHEIT_UND_ARBEITSWEISE.md](dokumentation/SICHERHEIT_UND_ARBEITSWEISE.md).
-Die Build- und Änderungshistorie steht in [dokumentation/HISTORIE.md](dokumentation/HISTORIE.md).
-Der Mindesttestplan steht in [dokumentation/TESTPLAN.md](dokumentation/TESTPLAN.md).
-
-## Aktueller Stand
-
-Aktueller Build laut `web_ui/build-info.json`: v43, Scanner STABLE / Self-Healing CSV.
-
-Bekannte technische Schulden:
-
-- `web_ui/js/app.js` ist zu groß und sollte mittelfristig modularisiert werden.
-- Versionshinweise in älteren Dateien sind historisch gewachsen.
-- Node.js ist installiert; neue Terminals sollten `node` automatisch im PATH haben. `Check-WebApp-Syntax.bat` prüft zusätzlich den Standardpfad.
-
-## Planung
-
-Die Aufgabenplanung liegt in:
-
+- [dokumentation/SICHERHEIT_UND_ARBEITSWEISE.md](dokumentation/SICHERHEIT_UND_ARBEITSWEISE.md)
+- [dokumentation/ROLLEN_RECHTE.md](dokumentation/ROLLEN_RECHTE.md)
+- [dokumentation/CODEX_ARBEITSKONZEPT.md](dokumentation/CODEX_ARBEITSKONZEPT.md)
+- [dokumentation/HISTORIE.md](dokumentation/HISTORIE.md)
+- [dokumentation/HELP_BEREICH.md](dokumentation/HELP_BEREICH.md)
+- [dokumentation/TESTPLAN.md](dokumentation/TESTPLAN.md)
 - [planung/NEXT.md](planung/NEXT.md)
 - [planung/TODO.md](planung/TODO.md)
-- [planung/WARTESCHLANGE.md](planung/WARTESCHLANGE.md)
-- [planung/STATUS.md](planung/STATUS.md)
-- [planung/CODEX_NEXT_PROMPT.md](planung/CODEX_NEXT_PROMPT.md)
-
-Empfohlene Reihenfolge: erst `NEXT.md`, dann `TODO.md`, später `WARTESCHLANGE.md`.
-Automatisierung: `Update-Planung.bat`, siehe [dokumentation/PLANUNG_AUTOMATION.md](dokumentation/PLANUNG_AUTOMATION.md).

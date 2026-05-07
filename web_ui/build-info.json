@@ -1,7 +1,7 @@
 {
-  "version": "v43",
-  "name": "Safety Guard + Scanner STABLE",
-  "buildDate": "2026-05-05 21:45:00",
+  "version": "v44",
+  "name": "Admin UX + Planning Complete",
+  "buildDate": "2026-05-06 10:45:00",
   "features": [
     "Notion Export ZIP",
     "CSV per table",
@@ -28,6 +28,11 @@
     "Scanner STABLE",
     "Safety confirmations",
     "Server payload validation",
-    "Updated documentation"
+    "Updated documentation",
+    "Admin action tiles",
+    "Visible Stammdaten reload status",
+    "Separated scanner start guidance",
+    "Unified notification helper",
+    "Reduced duplicate helper functions"
   ]
 }

@@ -15,7 +15,7 @@ Die Planungs-Automation hilft Codex und dir, den naechsten Arbeitsschritt schnel
 Alles aktualisieren:
 
 ```powershell
-Update-Planung.bat
+scripts\Update-Planung.bat
 ```
 
 Dieser Ablauf macht automatisch:
@@ -45,10 +45,10 @@ python tools/planning/plan_automation.py promote
 
 ## Arbeitsweise
 
-1. `Update-Planung.bat` ausfuehren.
+1. `scripts\Update-Planung.bat` ausfuehren.
 2. `planung/CODEX_NEXT_PROMPT.md` lesen.
 3. Naechste Aufgabe abarbeiten.
 4. Tests ausfuehren.
 5. Erledigte Checkbox in `NEXT.md` und bei uebernommenen Aufgaben auch in `TODO.md` markieren.
-6. `Update-Planung.bat` erneut ausfuehren.
+6. `scripts\Update-Planung.bat` erneut ausfuehren.
 7. Die erledigte NEXT-Aufgabe steht danach in `dokumentation/ERLEDIGTE_NEXT_AUFGABEN.md`, und `NEXT.md` enthaelt wieder nur den naechsten offenen Schritt.

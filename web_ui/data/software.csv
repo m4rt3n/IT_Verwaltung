@@ -1,6 +1,0 @@
-﻿Software-ID;Asset-ID;Gerätename;Softwarename;Version;Hersteller;Lizenzstatus;Update-Status;Kritikalität;Bemerkung
-SW-0002;AS-0003;MARTIN;Chrome;1.0;Google\Chrome;Prüfen;Prüfen;Normal;Automatisch erkannt: Chrome Remote Desktop
-SW-0003;AS-0003;MARTIN;Adobe Acrobat Reader;25.001.20937;Adobe;Prüfen;Prüfen;Hoch;Automatisch erkannt: Adobe Acrobat (64-bit)
-SW-0004;AS-0003;MARTIN;Microsoft Office;16.0.19929.20106;Microsoft Corporation;Prüfen;Prüfen;Hoch;Automatisch erkannt: Microsoft Office Professional Plus 2021 - de-de
-SW-0005;AS-0003;MARTIN;Visual C++ Redistributable;8.0.59193;Microsoft Corporation;Prüfen;Prüfen;Hoch;Automatisch erkannt: Microsoft Visual C++ 2005 Redistributable
-SW-0006;AS-0003;MARTIN;.NET Runtime;80.28.51996;Microsoft Corporation;Prüfen;Prüfen;Hoch;Automatisch erkannt: Microsoft .NET Runtime - 10.0.7 (x64)

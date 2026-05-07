@@ -4,6 +4,9 @@
 - Notebook
 - Thin Client
 - Drucker
+- Netzwerk
+- Peripherie
+- Zubehör
 - Access Point
 - Switch
 - Monitor

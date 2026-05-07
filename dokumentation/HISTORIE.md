@@ -4,13 +4,14 @@ Zentrale Übersicht über die gewachsenen Projektstände und Dokumentationsdatei
 
 ## Aktueller Stand
 
-- v43: Safety Guard + Scanner STABLE
+- v44: Admin-Aufbau geklärt, Stammdaten-Reload sichtbar, Scanner-Start getrennt dokumentiert
 - Datenhaltung: CSV mit serverseitigem Backup vor Schreibvorgängen
 - Web-App: lokale Bootstrap-Oberfläche mit Admin Panel
 - Scanner: PowerShell-Hardware-Scanner mit Syntaxcheck und CSV-Selbstheilung
 
 ## Build-Historie
 
+- v44: Admin-Kacheln für Datensicherung, Exporte und CSV-Wartung; sichtbarer Stammdaten-Reload-Status; getrennte Scanner-Befehlsübersicht; doppelte Helper bereinigt
 - v43: Scanner STABLE, Self-Healing CSV, Header-Validierung, Sicherheitsabfragen, Payload-Prüfung
 - v42: PowerShell-Parserfix für Variablen direkt vor `:`
 - v40: DB-Initialisierungsfix und Safe Smart Software Layer
@@ -38,10 +39,9 @@ Zentrale Übersicht über die gewachsenen Projektstände und Dokumentationsdatei
 
 ## Umgang mit alten Dateien
 
-Die bisherigen Einzeldateien bleiben erhalten, weil sie konkrete Fix-Kontexte enthalten. Neue Dokumentation sollte zuerst in diese zentralen Dateien:
+Ältere Build-Hinweise aus Einstiegstexten gehören in diese Historie. Die bisherigen Einzeldateien bleiben erhalten, weil sie konkrete Fix-Kontexte enthalten. Neue Dokumentation sollte zuerst in diese zentralen Dateien:
 
 - `README.md` für Einstieg und Betrieb
 - `PROJEKTUEBERSICHT.md` für Architektur und Datenmodell
 - `SICHERHEIT_UND_ARBEITSWEISE.md` für Schutz- und Testregeln
 - `HISTORIE.md` für Build- und Änderungsverlauf
-

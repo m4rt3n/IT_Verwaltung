@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 if (Get-Command python -ErrorAction SilentlyContinue) {
@@ -9,4 +9,3 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
 } else {
     throw "Python wurde nicht gefunden."
 }
-

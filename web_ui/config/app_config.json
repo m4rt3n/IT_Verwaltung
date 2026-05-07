@@ -1,0 +1,7 @@
+{
+  "host": "127.0.0.1",
+  "port": 8765,
+  "port_scan_range": 50,
+  "open_browser": true,
+  "backup_retention_note": "Backups werden lokal unter web_ui/backups abgelegt; automatische Loeschung ist nicht aktiv."
+}

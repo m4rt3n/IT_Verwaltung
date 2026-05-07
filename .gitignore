@@ -1,9 +1,11 @@
 # Runtime output
 logs/
 web_ui/backups/
+legacy/
 
 # Local/generated scan data
 web_ui/data/software_full.csv
+web_ui/data/software_full.json
 
 # Python cache
 __pycache__/
@@ -14,4 +16,3 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
-

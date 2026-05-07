@@ -1,17 +1,20 @@
 # Codex Next Prompt
 
-Arbeite die naechste offene Aufgabe aus `NEXT.md` ab:
+Lies zuerst `AGENTS.md` und `dokumentation/CODEX_ARBEITSKONZEPT.md`.
 
-- Abschnitt: Automatisch aus TODO uebernommen
-- Aufgabe: Stammdaten-Reload mit sichtbarer Erfolg-/Fehlermeldung versehen.
-- Datei/Zeile: planung/NEXT.md:7
+Arbeite die naechste offene Aufgabe aus `TODO.md` ab:
+
+- Abschnitt: UI und UX
+- Aufgabe: Mobile/kleine Fenster pruefen: Navigation, Admin Panel, Tabellen, Wizard und Help-Tab.
+- Datei/Zeile: planung/TODO.md:44
 
 Arbeitsregeln:
 
 - Vor Codeaenderungen relevante Dateien lesen.
+- Keine parallelen Systeme bauen, wenn bestehende Module erweitert werden koennen.
 - Keine bestehenden Nutzerdaten oder Backups loeschen.
 - Bei Schreib-/Datenaktionen Sicherheitsabfragen erhalten.
-- Nach Aenderungen `Check-WebApp-Syntax.bat` ausfuehren.
+- Nach Aenderungen `scripts\Check-WebApp-Syntax.bat` ausfuehren.
 - Danach `python tools/planning/plan_automation.py status` ausfuehren.
 - Erledigte Aufgaben in `planung/*.md` markieren.
 - Kurze Zusammenfassung mit geaenderten Dateien und Tests liefern.

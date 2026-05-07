@@ -7,7 +7,7 @@ Dieses Unterprogramm liest lokale Windows-Hardware aus und schreibt die Daten di
 ## Start
 
 ```text
-Start-HardwareScan.bat
+scripts\Start-HardwareScan.bat
 ```
 
 ## Erfasste Daten
@@ -50,7 +50,7 @@ Software:
 web_ui/data/assets.csv
 web_ui/data/hardware.csv
 web_ui/data/netzwerk.csv
-web_ui/data/software.csv
+web_ui/data/software_standard.csv
 ```
 
 ## Sicherheit

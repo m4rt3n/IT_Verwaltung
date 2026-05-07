@@ -1,7 +1,6 @@
 # NEXT
 
-Unmittelbare naechste Schritte fuer das Projekt.
+Stand: 2026-05-07
 
-## Automatisch aus TODO uebernommen
+Keine offenen unmittelbaren Schritte.
 
-- [ ] Stammdaten-Reload mit sichtbarer Erfolg-/Fehlermeldung versehen.

@@ -43,7 +43,7 @@ Die produktiven Tabellen aus `app_server.py` stimmen mit den vorhandenen CSV-Hea
 | --- | --- | ---: | --- | --- |
 | assets | `assets.csv` | 15 | ja | ja |
 | hardware | `hardware.csv` | 10 | ja | ja |
-| software | `software.csv` | 10 | ja | ja |
+| software | `software_standard.csv` | 10 | ja | ja |
 | netzwerk | `netzwerk.csv` | 15 | ja | ja |
 | tickets | `tickets.csv` | 11 | ja | nein |
 | notizen | `notizen.csv` | 7 | ja | nein |
@@ -51,7 +51,9 @@ Die produktiven Tabellen aus `app_server.py` stimmen mit den vorhandenen CSV-Hea
 
 Der Scanner bearbeitet aktuell nur `assets`, `hardware`, `software` und `netzwerk`. Das ist passend, weil Tickets, Notizen und Knowledge manuell bzw. in der Web-App gepflegt werden.
 
-`software_full.csv` ist ein Scan-Artefakt. Die Datei wird nur beim Scanner-Full-Software-Scan erzeugt und besitzt die Spalten `Name`, `Version`, `Hersteller`, `Quelle`, `InstallDatum`. Sie ist nicht in `app_server.py` als produktive Tabelle eingebunden und wird deshalb nicht durch `/api/load`, `/api/save` oder `/api/backup` verwaltet.
+`software_standard.csv` ist die produktive Web-App-Tabelle für planbare Standardsoftware und relevante Softwarezuordnungen.
+
+`software_full.csv` ist ein Scan-Artefakt. Die Datei wird nur beim separaten Full-Software-Scan erzeugt. Die bisherigen Spalten `Name`, `Version`, `Hersteller`, `Quelle`, `Pakettyp`, `PaketId`, `InstallDatum`, `Installationsort`, `Architektur` und `BenutzerKontext` bleiben erhalten. Ergänzt werden technische Inventarfelder wie `DisplayName`, `Publisher`, `InstallDate`, `InstallLocation`, `Source`, `Sources`, `Scope`, `Architecture`, `UserSID`, `PackageType`, `DetectionConfidence`, `RawSourceKey`, `RawPath`, `RawNames`, `RawEntryCount`, `ScanStatus` und `ScanMode`. Sie ist nicht in `app_server.py` als produktive Tabelle eingebunden und wird deshalb nicht durch `/api/load`, `/api/save` oder `/api/backup` verwaltet.
 
 ## Entscheidung zu `software_full.csv`
 
@@ -62,13 +64,17 @@ Stand: 2026-05-05
 Gruende:
 
 - Die Datei kann sehr gross werden und ist eher Diagnose-/Inventar-Rohmaterial als kuratierter Datenbestand.
-- Die Web-App nutzt fuer planbare Softwareverwaltung bereits `software.csv`.
+- Die Web-App nutzt fuer planbare Softwareverwaltung `software_standard.csv`.
 - `software_full.csv` wird bei Full-Software-Scans neu erzeugt und soll keine manuell gepflegten Daten enthalten.
 - Die Datei bleibt in `.gitignore`, damit lokale Softwareinventare nicht versehentlich versioniert werden.
+- Der Full-Software-Scan darf deutlich mehr Quellen erfassen als die Web-App-Tabelle `software_standard.csv`: Registry-Uninstall, geladene Benutzerprofile, Appx/MSIX, Winget, Chocolatey, Scoop, pip/pipx, npm, begrenzte Portable-Erkennung, Dienste und Treiber.
+- `software_full.json` enthält dieselben Softwaredaten plus `ScannerContext` und Quellenstatus. Auch diese Datei ist ein lokales Scan-Artefakt.
+- Hardware- und Software-Scan sind getrennt: `scripts\Start-HardwareScan.bat` schreibt keine Softwaredaten, `scripts\Start-SoftwareScan*.bat` schreibt keine Hardware- oder Netzwerkdaten.
 
 Konsequenz:
 
 - `software_full.csv` bleibt aus `TABLE_FILES` in `app_server.py` heraus.
+- `software.csv` ist nur noch ein Legacy-Name. Server und Scanner können ihn lesen/übernehmen, schreiben aber aktiv nach `software_standard.csv`.
 - `/api/load`, `/api/save` und `/api/backup` verwalten nur die produktiven Tabellen.
 - Wenn spaeter eine UI-Auswertung fuer vollstaendige Softwarelisten gebaut wird, sollte dafuer eine separate Import-/Analysefunktion entstehen, nicht dieselbe Persistenzlogik wie fuer Stammdaten.
 

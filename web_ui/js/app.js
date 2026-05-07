@@ -1,37 +1,3 @@
-// ===== v35 UI ENGINE =====
-const UI = {
-  speed: 160,
-  fadeSwap: function(el, html){
-    $(el).fadeOut(this.speed, function(){
-      $(this).html(html).fadeIn(UI.speed);
-    });
-  },
-  pulse: function(el){
-    $(el).addClass('pulse-success');
-    setTimeout(function(){ $(el).removeClass('pulse-success'); }, 800);
-  }
-};
-
-function bindUiChromeEvents(){
-  if(!window.jQuery) return;
-  $(document).on('mouseenter', '.card', function(){
-    $(this).addClass('shadow-lg').css('transform','translateY(-4px)');
-  });
-  $(document).on('mouseleave', '.card', function(){
-    $(this).removeClass('shadow-lg').css('transform','translateY(0)');
-  });
-  $(document).on('click', '.btn', function(){
-    const b = $(this);
-    b.css('transform','scale(0.95)');
-    setTimeout(function(){ b.css('transform','scale(1)'); }, 120);
-  });
-  $('#editModal, #deviceWizardModal').on('hidden.bs.modal', function () {
-    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  });
-}
-
-document.addEventListener('DOMContentLoaded', bindUiChromeEvents, {once:true});
-
 const ID_PREFIXES = {
   assets:'AS-',
   hardware:'HW-',
@@ -48,104 +14,12 @@ const SEED = {"assets": [{"Asset-ID": "AS-0001", "Gerätename": "EAH-BIB-PC-001"
 const STORAGE_KEY = 'itverwaltung-bootstrap-v7-conditional';
 let DB = loadDb();
 let CSV_BACKEND_AVAILABLE = false;
-
-// ===== v43 CLEAN CORE LAYER =====
-const CORE = {
-  version: 'v43',
-  findAsset: function(assetId){
-    if(!window.DB && typeof DB === 'undefined') return null;
-    if(!DB || !Array.isArray(DB.assets)) return null;
-    return DB.assets.find(function(a){ return a && a['Asset-ID'] === assetId; }) || null;
-  },
-  byAsset: function(table, assetId){
-    if(!DB || !Array.isArray(DB[table])) return [];
-    return DB[table].filter(function(row){ return row && row['Asset-ID'] === assetId; });
-  },
-  safeGet: function(obj, path, def){
-    try{
-      return String(path).split('.').reduce(function(o,k){ return o ? o[k] : undefined; }, obj) ?? def;
-    }catch(e){
-      return def;
-    }
-  },
-  setPath: function(obj, path, value){
-    if(!obj || !path) return;
-    var parts = String(path).split('.');
-    var cur = obj;
-    for(var i=0;i<parts.length-1;i++){
-      var key = parts[i];
-      if(typeof cur[key] !== 'object' || cur[key] === null) cur[key] = {};
-      cur = cur[key];
-    }
-    cur[parts[parts.length-1]] = value;
-  },
-  ensureSmartSoftwareDefaults: function(){
-    if(typeof DB === 'undefined' || !DB) return;
-    if(!DB.stammdaten) DB.stammdaten = {};
-    if(!Array.isArray(DB.stammdaten.software)){
-      DB.stammdaten.software = [
-        {name:"Firefox", isStandard:true, required:false},
-        {name:"Chrome", isStandard:true, required:false},
-        {name:"Adobe Acrobat Reader", isStandard:true, required:true},
-        {name:"Microsoft Office", isStandard:true, required:true},
-        {name:"UniGet / WinGet", isStandard:true, required:false},
-        {name:"Visual C++ Redistributable", isStandard:true, required:true},
-        {name:".NET Runtime", isStandard:true, required:true},
-        {name:"VPN Client", isStandard:false, required:false}
-      ];
-    }
-  },
-  isSoftwareInstalled: function(assetId, name){
-    if(typeof DB === 'undefined' || !DB || !Array.isArray(DB.software)) return false;
-    const needle = String(name || '').toLowerCase();
-    return DB.software.some(s =>
-      String(s["Asset-ID"] || '') === String(assetId || '') &&
-      String(s["Softwarename"] || '').toLowerCase().includes(needle)
-    );
-  }
-};
-
-function findAsset(assetId){
-  return CORE.findAsset(assetId);
-}
-function byAsset(table, assetId){
-  return CORE.byAsset(table, assetId);
-}
-function getPath(obj, path, def){
-  return CORE.safeGet(obj, path, def);
-}
-function setPath(obj, path, value){
-  return CORE.setPath(obj, path, value);
-}
-function ensureSmartSoftwareDefaults(){
-  return CORE.ensureSmartSoftwareDefaults();
-}
-function isSoftwareInstalled(assetId, name){
-  return CORE.isSoftwareInstalled(assetId, name);
-}
+let SERVER_STATUS = {loaded:false, ok:false, node:null, table_files:{}, legacy_table_files:{}, error:null};
+let ASSET_DETAIL_TAB = 'overview';
 
 const APP_SETTINGS_KEY = 'itverwaltung-v25-settings';
 let APP_SETTINGS = loadAppSettings();
 let BUILD_INFO = {version:null, name:null, buildDate:null, features:[], loaded:false, error:null};
-let STAMM = {};
-const STAMM_FILES = {
-  assetTypen:'stammdaten_asset_typen.md', status:'stammdaten_status.md', standorte:'stammdaten_standorte.md',
-  raeume:'stammdaten_raeume.md', hersteller:'stammdaten_hersteller.md', betriebssysteme:'stammdaten_betriebssysteme.md',
-  domaenen:'stammdaten_domaenen.md', netzwerktypen:'stammdaten_netzwerktypen.md', adressarten:'stammdaten_adressarten.md',
-  verbindungstypen:'stammdaten_verbindungstypen.md', vlans:'stammdaten_vlans.md', switches:'stammdaten_switches.md',
-  accesspoints:'stammdaten_accesspoints.md', ssids:'stammdaten_ssids.md', lizenzstatus:'stammdaten_lizenzstatus.md',
-  updateStatus:'stammdaten_update_status.md', kritikalitaet:'stammdaten_kritikalitaet.md', ticketKategorien:'stammdaten_ticket_kategorien.md',
-  prioritaeten:'stammdaten_prioritaeten.md', ticketStatus:'stammdaten_ticket_status.md', notizKategorien:'stammdaten_notiz_kategorien.md', tags:'stammdaten_tags.md'
-};
-const FALLBACK_STAMM = {
-  assetTypen:['PC','Notebook','Thin Client','Drucker','Access Point','Switch','Monitor'], status:['Aktiv','Defekt','Ausgemustert'],
-  standorte:['Bibliothek'], raeume:['05.00.060'], hersteller:['Dell','Lenovo'], betriebssysteme:['Windows 11','Embedded'], domaenen:['EAH','-'],
-  netzwerktypen:['LAN','WLAN','LAN/WLAN'], adressarten:['DHCP','Statisch'], verbindungstypen:['LAN direkt Wanddose','WLAN über Access Point'],
-  vlans:['120'], switches:['SW-BIB-01 / Port 12'], accesspoints:['AP-BIB-01','-'], ssids:['EAH-Intern','-'],
-  lizenzstatus:['Aktiv','Prüfen','Abgelaufen'], updateStatus:['Aktuell','Prüfen'], kritikalitaet:['Niedrig','Normal','Mittel','Hoch'],
-  ticketKategorien:['Netzwerk','Software','Drucker'], prioritaeten:['Niedrig','Normal','Hoch','Kritisch'], ticketStatus:['Offen','In Bearbeitung','Gelöst','Geschlossen'],
-  notizKategorien:['Betrieb','Erfassung'], tags:['netzwerk','lan','drucker']
-};
 
 const HERSTELLER_TYPEN = {
   "Dell": ["PC","Notebook","Monitor","Dockingstation","Server","Workstation"],
@@ -175,8 +49,24 @@ const SOFTWARE_KATALOG = {
   "Google": ["Chrome","Google Drive"],
   "Open Source": ["7-Zip","LibreOffice","GIMP"]
 };
+const MANUFACTURER_NORMALIZATION = {
+  microsoft:'Microsoft', 'microsoft corporation':'Microsoft', ms:'Microsoft',
+  adobe:'Adobe', 'adobe systems':'Adobe', 'adobe inc.':'Adobe',
+  dell:'Dell', 'dell inc.':'Dell', 'dell computer corporation':'Dell',
+  hp:'HP', 'hewlett-packard':'HP', 'hewlett packard':'HP',
+  lenovo:'Lenovo', 'lenovo group':'Lenovo',
+  fujitsu:'Fujitsu', kyocera:'Kyocera', canon:'Canon', brother:'Brother',
+  mozilla:'Mozilla', google:'Google', oracle:'Oracle', vmware:'VMware'
+};
 function getSoftwareNamesForManufacturer(manufacturer){
   return SOFTWARE_KATALOG[manufacturer] || [];
+}
+function normalizeManufacturer(value){
+  const raw = String(value || '').trim();
+  const key = raw.toLowerCase().replace(/\s+/g,' ');
+  const mapped = MANUFACTURER_NORMALIZATION[key] || raw;
+  const stamm = STAMM?.hersteller || [];
+  return stamm.find(x => x.toLowerCase() === mapped.toLowerCase()) || mapped;
 }
 
 const MODELLSERIEN = {
@@ -280,15 +170,15 @@ const modules = [
   {key:'tickets',title:'Tickets',mode:'module',id:'Ticket-ID',prefix:ID_PREFIXES.tickets,editable:true,group:'support'},
   {key:'notizen',title:'Notizen',mode:'module',id:'Notiz-ID',prefix:ID_PREFIXES.notizen,editable:true,group:'support'},
   {key:'knowledge',title:'Knowledge',mode:'simple',id:'Knowledge-ID',prefix:ID_PREFIXES.knowledge,editable:true,group:'support'},
+  {key:'help',title:'Hilfe',mode:'help',editable:false,group:'support'},
   {key:'adminpanel',title:'Admin Panel',mode:'adminpanel',editable:false,group:'admin'},
   {key:'stammdaten',title:'Stammdaten',mode:'stammdaten',editable:false,group:'admin'}
 ];
 let activeKey='dashboard', searchText='', selectedIndex=Object.fromEntries(modules.map(m=>[m.key,0]));
 let modalState={key:null,index:null,mode:null}, wizard={step:0,data:null};
+const LIST_STATE_KEY = 'itverwaltung-v44-list-state';
+let LIST_STATE = loadListState();
 
-function parseMdList(text){return text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.startsWith('- ')).map(l=>l.replace(/^- /,'').trim()).filter(Boolean);}
-async function loadStammdaten(){STAMM={};for(const [key,file] of Object.entries(STAMM_FILES)){try{const txt=await fetch('stammdaten/'+file+'?v='+Date.now()).then(r=>{if(!r.ok)throw new Error();return r.text();});STAMM[key]=parseMdList(txt);}catch{STAMM[key]=FALLBACK_STAMM[key]||[];}}}
-async function reloadStammdaten(){await loadStammdaten();render();toast('Stammdaten neu geladen.');}
 function normalizeIdValue(value){
   const text = String(value || '');
   const match = text.match(LEGACY_ID_PATTERN);
@@ -311,143 +201,46 @@ function normalizeDbIds(db){
 function loadDb(){try{return normalizeDbIds(JSON.parse(localStorage.getItem(STORAGE_KEY))||structuredClone(SEED));}catch{return normalizeDbIds(structuredClone(SEED));}}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(DB));}
 function val(row,key,fallback='-'){return row&&row[key]?row[key]:fallback;}
-function byAsset(key,id){return (DB[key]||[]).filter(x=>x['Asset-ID']===id);}
 function firstByAsset(key,id){return byAsset(key,id)[0]||null;}
 function assetName(id){const a=DB.assets.find(x=>x['Asset-ID']===id);return a?a['Gerätename']:'-';}
 function assetFor(row){return DB.assets.find(a=>a['Asset-ID']===row['Asset-ID']);}
-function filterRows(rows){if(!searchText.trim())return rows;const q=searchText.toLowerCase();return rows.filter(r=>Object.values(r).join(' ').toLowerCase().includes(q));}
+function loadListState(){try{return JSON.parse(localStorage.getItem(LIST_STATE_KEY)) || {};}catch{return {};}}
+function saveListState(){localStorage.setItem(LIST_STATE_KEY, JSON.stringify(LIST_STATE));}
+function listState(key){if(!LIST_STATE[key]) LIST_STATE[key]={sort:'smart', group:'none', filterField:'', filterValue:'', savedView:''};return LIST_STATE[key];}
+function setListState(key, prop, value){listState(key)[prop]=value;saveListState();selectedIndex[key]=0;render();}
+function filterRows(rows,key=activeKey){const base = !searchText.trim()?rows:rows.filter(r=>Object.values(r).join(' ').toLowerCase().includes(searchText.toLowerCase()));return applyListState(key, base);}
+function applyListState(key, rows){
+  const state = listState(key);
+  let out = [...rows];
+  if(state.savedView === 'open_tickets') out = out.filter(r => r.Status === 'Offen');
+  if(state.savedView === 'incomplete') out = out.filter(r => missingRequiredFields(key, r).length > 0);
+  if(state.savedView === 'orphan') out = out.filter(r => key !== 'assets' && r['Asset-ID'] && !CORE.findAsset(r['Asset-ID']));
+  if(state.savedView === 'scan_unknown') out = out.filter(r => key === 'assets' && !hasFullScanForAsset(r));
+  if(state.filterField && state.filterValue) out = out.filter(r => String(r[state.filterField] || '') === state.filterValue);
+  out.sort((a,b)=>multiSortRows(key,a,b,state.sort));
+  return out;
+}
+function multiSortRows(key,a,b,mode){
+  const status = String(a.Status || a['Update-Status'] || '').localeCompare(String(b.Status || b['Update-Status'] || ''), 'de');
+  if(status && (mode === 'smart' || mode === 'status')) return status;
+  const nameA = String(a['Gerätename'] || a.Softwarename || a.Titel || a['Asset-ID'] || '');
+  const nameB = String(b['Gerätename'] || b.Softwarename || b.Titel || b['Asset-ID'] || '');
+  if(mode === 'date') return String(b.Datum || b['Garantie bis'] || '').localeCompare(String(a.Datum || a['Garantie bis'] || ''), 'de');
+  return nameA.localeCompare(nameB, 'de');
+}
+function missingRequiredFields(key,row){
+  const fields = (typeof REQUIRED_FIELDS !== 'undefined' && REQUIRED_FIELDS[key]) ? REQUIRED_FIELDS[key] : [];
+  return fields.filter(field => !String(row[field] || '').trim());
+}
+function hasFullScanForAsset(asset){
+  const rows = softwareFullBaseRows ? softwareFullBaseRows() : [];
+  return rows.some(row => row['Asset-ID'] === asset['Asset-ID'] || row['Gerätename'] === asset['Gerätename']);
+}
 function clamp(i,len){if(len<=0)return 0;if(i<0)return 0;if(i>=len)return len-1;return i;}
 function nextId(key,idField,prefix){const nums=(DB[key]||[]).map(r=>r[idField]||'').map(id=>parseInt((id.match(/(\d+)$/)||['0','0'])[1],10));return prefix+(Math.max(0,...nums)+1).toString().padStart(4,'0');}
 function deviceCode(type){return {'PC':'PC','Notebook':'NB','Thin Client':'IGEL','Drucker':'DR','Access Point':'AP','Switch':'SW','Monitor':'MON'}[type]||'DEV';}
 function nextDeviceName(type,bereich='BIB'){return `EAH-${bereich}-${deviceCode(type)}-${(DB.assets.length+1).toString().padStart(3,'0')}`;}
 function clearSearch(){document.getElementById('globalSearch').value='';searchText='';render();}
-function toast(msg){const t=document.getElementById('toast');t.innerHTML=`<div class="alert alert-success shadow">${msg}</div>`;setTimeout(()=>t.innerHTML='',1800);}
-function safetyConfirm(action, detail=''){
-  const text = detail ? `${action}\n\n${detail}` : action;
-  return confirm(`${text}\n\nFortfahren?`);
-}
-const REQUIRED_FIELDS = {
-  assets:['Asset-ID','Gerätename','Asset-Typ','Status'],
-  hardware:['Hardware-ID','Asset-ID','Gerätename'],
-  software:['Software-ID','Asset-ID','Gerätename','Softwarename'],
-  netzwerk:['Netzwerk-ID','Asset-ID','Gerätename','Netzwerktyp','Adressart'],
-  tickets:['Ticket-ID','Asset-ID','Gerätename','Titel','Status'],
-  notizen:['Notiz-ID','Asset-ID','Gerätename','Titel'],
-  knowledge:['Knowledge-ID','Titel','Lösung']
-};
-function validateDbBeforeWrite(){
-  const required = ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'];
-  const missing = required.filter(k=>!Array.isArray(DB[k]));
-  if(missing.length){
-    return {ok:false, message:'Fehlende oder ungueltige Tabellen: ' + missing.join(', ')};
-  }
-  const fieldErrors = [];
-  Object.entries(REQUIRED_FIELDS).forEach(([table, fields])=>{
-    (DB[table] || []).forEach((row, index)=>{
-      const missingFields = fields.filter(field=>!String(row?.[field] || '').trim());
-      if(missingFields.length){
-        fieldErrors.push(`${table}[${index + 1}]: ${missingFields.join(', ')}`);
-      }
-    });
-  });
-  if(fieldErrors.length){
-    return {ok:false, message:'Pflichtfelder fehlen: ' + fieldErrors.slice(0, 20).join('; ')};
-  }
-  return {ok:true, message:''};
-}
-async function loadBuildInfo(){
-  try{
-    const data = await fetch('build-info.json?v=' + Date.now()).then(r=>{
-      if(!r.ok) throw new Error('build-info.json konnte nicht geladen werden.');
-      return r.json();
-    });
-    BUILD_INFO = {
-      version: data.version || null,
-      name: data.name || null,
-      buildDate: data.buildDate || null,
-      features: Array.isArray(data.features) ? data.features : [],
-      loaded: true,
-      error: null
-    };
-  }catch(e){
-    BUILD_INFO = {version:null, name:null, buildDate:null, features:[], loaded:false, error:e.message};
-  }
-}
-
-async function loadDbFromServer(){
-  try{
-    const res = await fetch('/api/load?v=' + Date.now());
-    if(!res.ok) throw new Error('API load failed');
-    const data = await res.json();
-    ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'].forEach(k=>{
-      if(Array.isArray(data[k])) DB[k] = data[k];
-    });
-    normalizeDbIds(DB);
-    CSV_BACKEND_AVAILABLE = true;
-    return true;
-  }catch(e){
-    CSV_BACKEND_AVAILABLE = false;
-    return false;
-  }
-}
-
-function maybeSaveDbToServer(){
-  if(APP_SETTINGS.autosave) return saveDbToServer();
-  render();
-  return Promise.resolve(false);
-}
-
-async function saveDbToServer(manual=false){
-  try{
-    const check = validateDbBeforeWrite();
-    if(!check.ok) throw new Error(check.message);
-    if(manual && !safetyConfirm('CSV-Dateien jetzt speichern?', 'Vor dem Schreiben erstellt der Server automatisch ein Backup.')){
-      return false;
-    }
-    const res = await fetch('/api/save', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(DB)
-    });
-    if(!res.ok){
-      const txt = await res.text();
-      throw new Error(txt || 'Speichern fehlgeschlagen');
-    }
-    CSV_BACKEND_AVAILABLE = true;
-    if(typeof showToast === 'function') showToast('In CSV gespeichert.', 'success'); else toast('In CSV gespeichert.');
-    render();
-    return true;
-  }catch(e){
-    console.error(e);
-    CSV_BACKEND_AVAILABLE = false;
-    if(typeof showToast === 'function') showToast('CSV-Speichern fehlgeschlagen: ' + e.message, 'error'); else alert('CSV-Speichern fehlgeschlagen: ' + e.message);
-    render();
-    return false;
-  }
-}
-
-
-async function backupCsvServer(){
-  try{
-    if(!safetyConfirm('CSV-Ordner-Backup erstellen?', 'Es werden Kopien der aktuellen CSV-Dateien unter web_ui/backups abgelegt.')){
-      return false;
-    }
-    const res = await fetch('/api/backup', {method:'POST'});
-    if(!res.ok) throw new Error(await res.text());
-    toast('CSV-Backup erstellt.');
-    return true;
-  }catch(e){
-    alert('Backup nicht möglich:\n' + e.message);
-    return false;
-  }
-}
-function csvStatusBadge(){
-  return CSV_BACKEND_AVAILABLE
-    ? '<span class="badge text-bg-success">CSV Backend aktiv</span>'
-    : '<span class="badge text-bg-warning">Browser-Modus / nicht gespeichert</span>';
-}
-
-
 function runCoreSelfTest(){
   const missing = [];
   ['setPath','getPath','sel','f','manufacturerSelect','modelSeriesSelect','saveWizardFields','renderWizard','wizardStepHtml'].forEach(name=>{
@@ -461,44 +254,7 @@ function runCoreSelfTest(){
 }
 
 
-// ===== v30.2 SAFE UX SAVE LAYER =====
-function showToast(msg, type='success'){
-  const old = document.querySelectorAll('.toast-custom');
-  old.forEach(x=>x.remove());
-  const el = document.createElement('div');
-  el.className = 'toast-custom toast-' + type;
-  el.innerText = msg;
-  document.body.appendChild(el);
-  setTimeout(()=> el.classList.add('show'), 10);
-  setTimeout(()=> el.remove(), 3000);
-}
-
-function setSaving(state){
-  document.querySelectorAll('[data-save-button="true"]').forEach(b=>{
-    if(state){
-      if(!b.dataset.old) b.dataset.old = b.innerHTML;
-      b.innerHTML = '⏳ Speichern...';
-      b.disabled = true;
-    }else{
-      if(b.dataset.old) b.innerHTML = b.dataset.old;
-      b.disabled = false;
-      delete b.dataset.old;
-    }
-  });
-}
-
-function safeSave(fn){
-  try{
-    return fn();
-  }catch(e){
-    console.error('SAVE ERROR:', e);
-    showToast('Fehler: ' + e.message, 'error');
-    return false;
-  }
-}
-
-
-// ===== v43 SAFE SMART SOFTWARE LAYER =====
+// ===== v44 SAFE SMART SOFTWARE LAYER =====
 function renderSoftwareStatus(assetId){
   ensureSmartSoftwareDefaults();
   if(typeof DB === 'undefined' || !DB || !DB.stammdaten || !Array.isArray(DB.stammdaten.software)) return "";
@@ -511,7 +267,48 @@ function renderSoftwareStatus(assetId){
   }).join("");
 }
 
-async function init(){runCoreSelfTest();await loadBuildInfo();await loadDbFromServer();await loadStammdaten();document.getElementById('globalSearch').addEventListener('input',e=>{searchText=e.target.value;render();});renderAll();}
+async function init(){runCoreSelfTest();await loadBuildInfo();await loadServerStatus();await loadDbFromServer();await loadSoftwareFullFromServer();await loadSoftwareClassification();await loadStammdaten();if(typeof loadHelpDocs === 'function') await loadHelpDocs();const search=document.getElementById('globalSearch');search.addEventListener('input',e=>{searchText=e.target.value;render();});search.addEventListener('keydown',e=>{if(e.key==='Escape'){clearSearch();}else if(e.key==='Enter'){render();}});renderAll();}
+function isAdminRole(){
+  return (APP_SETTINGS.role || 'admin') === 'admin';
+}
+function canWrite(){
+  return isAdminRole();
+}
+function requireWriteAccess(action='Diese Aktion'){
+  if(canWrite()) return true;
+  notify(`${action} ist im Normalmodus gesperrt.`, 'warning');
+  return false;
+}
+function visibleModules(){
+  return modules.filter(m => isAdminRole() || m.group !== 'admin');
+}
+function roleLabel(){
+  return isAdminRole() ? 'Admin' : 'Normal';
+}
+function renderRoleControl(){
+  return `<div class="role-control" title="Lokaler UI-Modus: Normal blendet Admin-Funktionen aus und sperrt Schreibaktionen.">
+    <span class="role-label">${roleLabel()}</span>
+    <select class="form-select form-select-sm role-select" onchange="setRole(this.value)" aria-label="Rollenmodus wechseln">
+      <option value="admin" ${isAdminRole()?'selected':''}>Admin</option>
+      <option value="normal" ${!isAdminRole()?'selected':''}>Normal</option>
+    </select>
+  </div>`;
+}
+function applyRoleUi(){
+  const roleTarget = document.getElementById('roleControl');
+  if(roleTarget) roleTarget.innerHTML = renderRoleControl();
+  const newDeviceBtn = document.getElementById('newDeviceBtn');
+  if(newDeviceBtn){
+    newDeviceBtn.classList.toggle('d-none', !canWrite());
+    newDeviceBtn.title = canWrite() ? 'Neues Gerät über den Wizard erfassen.' : 'Im Normalmodus sind Schreibaktionen gesperrt.';
+  }
+}
+function setRole(role){
+  APP_SETTINGS.role = role === 'normal' ? 'normal' : 'admin';
+  saveAppSettings();
+  renderAll();
+  notify(`Rollenmodus: ${roleLabel()}`, 'info');
+}
 function tabButton(m){
   const cls = [
     'nav-link',
@@ -523,20 +320,24 @@ function tabButton(m){
   return `<li class="nav-item"><button class="${cls}" onclick="openTab('${m.key}')">${m.title}</button></li>`;
 }
 function navGroup(title, groupKey){
+  const groupModules = visibleModules().filter(m=>m.group===groupKey);
+  if(!groupModules.length) return '';
   return `<div class="nav-group nav-group-${groupKey}">
     <div class="nav-group-label">${title}</div>
-    <ul class="nav nav-tabs grouped-tabs">${modules.filter(m=>m.group===groupKey).map(tabButton).join('')}</ul>
+    <ul class="nav nav-tabs grouped-tabs">${groupModules.map(tabButton).join('')}</ul>
   </div>`;
 }
 function renderAll(){
+  if(!visibleModules().some(m=>m.key===activeKey)) activeKey='dashboard';
+  applyRoleUi();
   document.getElementById('tabs').innerHTML =
     navGroup('IT-Verwaltung', 'main') +
     navGroup('Dokumentation & Wissen', 'support') +
     navGroup('Konfiguration', 'admin');
   render();
 }
-function openTab(key){activeKey=key;renderAll();}
-function render(){const mod=modules.find(m=>m.key===activeKey);const c=document.getElementById('tabContent');c.className='pt-3 page-group-'+(mod?.group||'main');if(mod.mode==='dashboard')c.innerHTML=renderDashboard();else if(mod.mode==='asset')c.innerHTML=renderAssets();else if(mod.mode==='module')c.innerHTML=renderLinkedModule(mod);else if(mod.mode==='adminpanel')c.innerHTML=renderAdminPanel();else if(mod.mode==='stammdaten')c.innerHTML=renderStammdaten();else c.innerHTML=renderSimpleModule(mod);uxAnimateContent();}
+function openTab(key){if(!visibleModules().some(m=>m.key===key))key='dashboard';activeKey=key;renderAll();}
+function render(){const mod=visibleModules().find(m=>m.key===activeKey)||visibleModules()[0];const c=document.getElementById('tabContent');c.className='pt-3 page-group-'+(mod?.group||'main');if(mod.mode==='dashboard')c.innerHTML=renderDashboard();else if(mod.mode==='asset')c.innerHTML=renderAssets();else if(mod.mode==='module')c.innerHTML=renderLinkedModule(mod);else if(mod.mode==='adminpanel')c.innerHTML=renderAdminPanel();else if(mod.mode==='stammdaten')c.innerHTML=renderStammdaten();else if(mod.mode==='help')c.innerHTML=renderHelp();else c.innerHTML=renderSimpleModule(mod);uxAnimateContent();}
 
 function renderBuildInfoCard(){
   return `<div class="card mt-3 build-info-card">
@@ -556,6 +357,7 @@ function renderBuildInfoCard(){
   </div>`;
 }
 function loadDemoData(){
+  if(!requireWriteAccess('Demo-Daten laden')) return;
   fetch('demo_data.json?v=' + Date.now())
     .then(r=>r.json())
     .then(data=>{
@@ -563,29 +365,13 @@ function loadDemoData(){
       toast('Demo-Daten geladen');
       renderAll();
     })
-    .catch(()=>alert('demo_data.json konnte nicht geladen werden.'));
+    .catch(()=>notify('demo_data.json konnte nicht geladen werden.', 'error'));
 }
 function importJson(){
-  const input = document.createElement('input');
-  input.type='file';
-  input.accept='application/json';
-  input.onchange=e=>{
-    const file=e.target.files[0];
-    if(!file) return;
-    const reader=new FileReader();
-    reader.onload=()=>{
-      try{
-        const data=JSON.parse(reader.result);
-        ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'].forEach(k=>DB[k]=data[k]||[]);
-        toast('Daten importiert');
-        renderAll();
-      }catch(err){ alert('Fehler beim Import: ungültiges JSON'); }
-    };
-    reader.readAsText(file);
-  };
-  input.click();
+  return importAllFromOneFile();
 }
 function generateRandomTickets(){
+  if(!requireWriteAccess('Tickets generieren')) return;
   const problems=['PC startet nicht','WLAN instabil','Blue Screen','Drucker offline','Softwarefehler','Netzwerk langsam'];
   (DB.assets||[]).forEach(a=>{
     if(Math.random()>.6){
@@ -712,17 +498,19 @@ function topologyLines(){
 
 // ===== v25 CLEAN UX + ADMIN PANEL =====
 function loadAppSettings(){
+  const defaults = {
+    darkMode:false,
+    animations:true,
+    compactMode:false,
+    autosave:true,
+    confirmDelete:true,
+    startView:'topology',
+    role:'admin'
+  };
   try{
-    return JSON.parse(localStorage.getItem(APP_SETTINGS_KEY)) || {
-      darkMode:false,
-      animations:true,
-      compactMode:false,
-      autosave:true,
-      confirmDelete:true,
-      startView:'topology'
-    };
+    return {...defaults, ...(JSON.parse(localStorage.getItem(APP_SETTINGS_KEY)) || {})};
   }catch{
-    return {darkMode:false,animations:true,compactMode:false,autosave:true,confirmDelete:true,startView:'topology'};
+    return defaults;
   }
 }
 function saveAppSettings(){
@@ -733,6 +521,7 @@ function applyAppSettings(){
   document.body.classList.toggle('dark-mode', !!APP_SETTINGS.darkMode);
   document.body.classList.toggle('animations-off', !APP_SETTINGS.animations);
   document.body.classList.toggle('compact-mode', !!APP_SETTINGS.compactMode);
+  document.body.classList.toggle('role-normal', !isAdminRole());
 }
 function setSetting(key, value){
   APP_SETTINGS[key] = value;
@@ -745,566 +534,7 @@ function uxAnimateContent(){
   $('.card').addClass('ux-card-enter');
   setTimeout(()=>$('.card').removeClass('ux-card-enter'), 280);
 }
-function uxHighlight(selector){
-  if(!APP_SETTINGS.animations || typeof $ === 'undefined') return;
-  $(selector).addClass('ux-highlight');
-  setTimeout(()=>$(selector).removeClass('ux-highlight'), 650);
-}
-function uxShake(selector){
-  if(!APP_SETTINGS.animations || typeof $ === 'undefined') return;
-  $(selector).addClass('ux-shake');
-  setTimeout(()=>$(selector).removeClass('ux-shake'), 450);
-}
-function uxSuccess(message){
-  toast(message || 'Gespeichert.');
-  uxHighlight('.card:visible:first');
-}
-
-// ===== v31 ONE-FILE BACKUP / IMPORT =====
-function createExportPayload(){
-  return {
-    meta:{
-      app:'IT-Verwaltung',
-      version:(typeof BUILD_INFO !== 'undefined' && BUILD_INFO.version) ? BUILD_INFO.version : 'unknown',
-      exportedAt:new Date().toISOString(),
-      format:'itverwaltung-full-backup-json-v1'
-    },
-    data:{
-      assets:DB.assets||[],
-      hardware:DB.hardware||[],
-      software:DB.software||[],
-      netzwerk:DB.netzwerk||[],
-      tickets:DB.tickets||[],
-      notizen:DB.notizen||[],
-      knowledge:DB.knowledge||[]
-    }
-  };
-}
-
-function exportAllToOneFile(){
-  if(!safetyConfirm('Backup-Datei erstellen?', 'Alle Tabellen werden als JSON-Datei exportiert.')){
-    return;
-  }
-  const payload = createExportPayload();
-  const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-  const filename = `IT-Verwaltung_Backup_${stamp}.json`;
-  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
-  if(typeof showToast === 'function') showToast('Backup-Datei erstellt.', 'success'); else toast('Backup-Datei erstellt.');
-}
-
-function importAllFromOneFile(){
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json,application/json';
-  input.onchange = e=>{
-    const file = e.target.files && e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      try{
-        const parsed = JSON.parse(reader.result);
-        const data = parsed.data || parsed;
-        const keys = ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'];
-        const missing = keys.filter(k=>!Array.isArray(data[k]));
-        if(missing.length){
-          throw new Error('Ungültige Backup-Datei. Fehlende Tabellen: ' + missing.join(', '));
-        }
-        if(!safetyConfirm('Backup importieren?', 'Aktuelle Browserdaten werden ersetzt und anschließend in CSV geschrieben.')){
-          return;
-        }
-        keys.forEach(k=>DB[k] = data[k] || []);
-        persist();
-        if(typeof saveDbToServer === 'function') saveDbToServer();
-        renderAll();
-        if(typeof showToast === 'function') showToast('Backup importiert.', 'success'); else toast('Backup importiert.');
-      }catch(err){
-        console.error(err);
-        alert('Import fehlgeschlagen: ' + err.message);
-      }
-    };
-    reader.readAsText(file);
-  };
-  input.click();
-}
-
-function adminStoragePanel(){
-  return `<div class="card admin-card mb-3">
-    <div class="card-header"><b>Backup & Import</b></div>
-    <div class="card-body">
-      <div class="alert alert-info">
-        Ein-Klick-Backup speichert alle Tabellen in <b>eine JSON-Datei</b>.
-        Der Import lädt diese eine Datei wieder ein und schreibt die Daten anschließend in CSV.
-      </div>
-      <div class="d-flex flex-wrap gap-2">
-        <button class="btn btn-success" onclick="exportAllToOneFile()">⬇ Alles als eine Datei sichern</button>
-        <button class="btn btn-primary" onclick="exportNotionZip()">Notion Export ZIP</button>
-        <button class="btn btn-outline-primary" onclick="importAllFromOneFile()">⬆ Eine Backup-Datei laden</button>
-        <button class="btn btn-outline-success" data-save-button="true" onclick="saveDbToServer(true)">CSV jetzt speichern</button>
-        <button class="btn btn-outline-secondary" onclick="backupCsvServer()">CSV-Ordner-Backup</button>
-      </div>
-      <div class="text-muted mt-2">
-        Empfehlung: Für normale Sicherungen die JSON-Datei nutzen. CSV bleibt intern als Arbeitsdatenbestand erhalten.
-      </div>
-    </div>
-  </div>`;
-}
-
-
-// ===== v38 NOTION READY EXPORT =====
-function csvEscapeValue(value){
-  if(value === null || typeof value === 'undefined') return '';
-  return '"' + String(value).replace(/"/g,'""').replace(/\r?\n/g,' ') + '"';
-}
-
-function toNotionCSV(rows, preferredColumns){
-  rows = Array.isArray(rows) ? rows : [];
-  let columns = [];
-  (preferredColumns || []).forEach(c => { if(!columns.includes(c)) columns.push(c); });
-  rows.forEach(row => {
-    Object.keys(row || {}).forEach(k => { if(!columns.includes(k)) columns.push(k); });
-  });
-  if(!columns.length) return '';
-  const lines = [];
-  lines.push(columns.map(csvEscapeValue).join(','));
-  rows.forEach(row => {
-    lines.push(columns.map(c => csvEscapeValue(row ? row[c] : '')).join(','));
-  });
-  return lines.join('\n');
-}
-
-function notionExportTables(){
-  return {
-    "assets.csv": {
-      rows: DB.assets || [],
-      columns: ["Asset-ID","Gerätename","Asset-Typ","Standort","Raum","Status","Hauptnutzer","Hersteller","Modellserie","Modell","Seriennummer","Inventarnummer","Betriebssystem","Domäne","Notizen"]
-    },
-    "hardware.csv": {
-      rows: DB.hardware || [],
-      columns: ["Hardware-ID","Asset-ID","Gerätename","CPU","RAM","Speicher","Monitor","Dockingstation","Garantie bis","Bemerkung"]
-    },
-    "software.csv": {
-      rows: DB.software || [],
-      columns: ["Software-ID","Asset-ID","Gerätename","Softwarename","Version","Hersteller","Lizenzstatus","Update-Status","Kritikalität","Bemerkung"]
-    },
-    "netzwerk.csv": {
-      rows: DB.netzwerk || [],
-      columns: ["Netzwerk-ID","Asset-ID","Gerätename","Netzwerktyp","Adressart","Verbindungstyp","IP-Adresse","MAC-Adresse","DNS","VLAN","Switch-Port","Wanddose","Access Point","SSID","Bemerkung"]
-    },
-    "tickets.csv": {
-      rows: DB.tickets || [],
-      columns: ["Ticket-ID","Asset-ID","Gerätename","Titel","Kategorie","Priorität","Status","Tags","Ursache","Lösung","Knowledge-ID"]
-    },
-    "notizen.csv": {
-      rows: DB.notizen || [],
-      columns: ["Notiz-ID","Asset-ID","Gerätename","Titel","Kategorie","Status","Inhalt"]
-    },
-    "knowledge.csv": {
-      rows: DB.knowledge || [],
-      columns: ["Knowledge-ID","Titel","Kategorie","Tags","Lösung"]
-    }
-  };
-}
-
-function notionReadmeText(){
-  return `NOTION IMPORT ANLEITUNG
-
-Export erstellt: ${new Date().toLocaleString()}
-
-INHALT
-- assets.csv
-- hardware.csv
-- software.csv
-- netzwerk.csv
-- tickets.csv
-- notizen.csv
-- knowledge.csv
-
-EMPFOHLENE IMPORT-REIHENFOLGE
-1. assets.csv zuerst importieren
-2. hardware.csv importieren
-3. software.csv importieren
-4. netzwerk.csv importieren
-5. tickets.csv importieren
-6. notizen.csv importieren
-7. knowledge.csv importieren
-
-WICHTIG
-- Asset-ID ist der gemeinsame Schlüssel.
-- Notion erstellt Relationen nicht automatisch aus CSV.
-- Nach dem Import kannst du in Notion Relation-Felder anlegen.
-
-EMPFOHLENE RELATIONEN
-- hardware.Asset-ID -> assets.Asset-ID
-- software.Asset-ID -> assets.Asset-ID
-- netzwerk.Asset-ID -> assets.Asset-ID
-- tickets.Asset-ID -> assets.Asset-ID
-- notizen.Asset-ID -> assets.Asset-ID
-- tickets.Knowledge-ID -> knowledge.Knowledge-ID
-
-HINWEIS
-Diese ZIP ist ohne Notion API nutzbar.
-Jede CSV wird in Notion als eigene Datenbank importiert.
-`;
-}
-
-function downloadBlob(blob, filename){
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
-}
-
-function exportNotionZip(){
-  try{
-    if(!safetyConfirm('Notion Export ZIP erstellen?', 'Alle Tabellen werden als Notion-kompatible CSV-Dateien in eine ZIP geschrieben.')){
-      return;
-    }
-    if(typeof JSZip === 'undefined'){
-      alert('JSZip konnte nicht geladen werden. Bitte Internetverbindung/CDN prüfen oder lokale JSZip-Datei einbinden.');
-      return;
-    }
-
-    const zip = new JSZip();
-    const tables = notionExportTables();
-    Object.entries(tables).forEach(([filename, cfg]) => {
-      zip.file(filename, toNotionCSV(cfg.rows, cfg.columns));
-    });
-    zip.file("README.txt", notionReadmeText());
-
-    const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    zip.generateAsync({type:"blob"}).then(content => {
-      downloadBlob(content, `notion_export_${stamp}.zip`);
-      if(typeof showToast === 'function') showToast('Notion Export ZIP erstellt.', 'success');
-      else if(typeof toast === 'function') toast('Notion Export ZIP erstellt.');
-    }).catch(err => {
-      console.error(err);
-      alert('Notion ZIP Export fehlgeschlagen: ' + err.message);
-    });
-  }catch(e){
-    console.error(e);
-    alert('Notion Export Fehler: ' + e.message);
-  }
-}
-
-function renderAdminPanel(){
-  return `${adminStoragePanel()}${renderBuildInfoCard()}<div class="row g-3">
-    <div class="col-lg-5">
-      <div class="card admin-card">
-        <div class="card-header"><b>Darstellung</b></div>
-        <div class="card-body">
-          ${adminSwitch('darkMode','Dark Mode','Dunkle Oberfläche aktivieren')}
-          ${adminSwitch('animations','Animationen','dezente jQuery Effekte aktivieren')}
-          ${adminSwitch('compactMode','Kompaktmodus','weniger Abstände in Tabellen/Karten')}
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-7">
-      <div class="card admin-card">
-        <div class="card-header"><b>Speicherung & Sicherheit</b></div>
-        <div class="card-body">
-          ${adminSwitch('autosave','Auto-Save','nach Änderungen automatisch CSV speichern')}
-          ${adminSwitch('confirmDelete','Löschbestätigung','vor Löschvorgängen Sicherheitsabfrage anzeigen')}
-          <hr>
-          <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-outline-primary" onclick="reloadStammdaten()">Stammdaten neu laden</button>
-          </div>
-          <div class="text-muted mt-2">Backup, Import, Export und manuelles CSV-Speichern liegen ausschließlich im Bereich <b>Backup & Import</b>.</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-6">
-      <div class="card admin-card">
-        <div class="card-header"><b>Dashboard</b></div>
-        <div class="card-body">
-          <label class="form-label">Standardansicht</label>
-          <select class="form-select" onchange="setSetting('startView',this.value);DASHBOARD_VIEW=this.value;localStorage.setItem('dashboardView',this.value)">
-            <option value="topology" ${APP_SETTINGS.startView==='topology'?'selected':''}>Topologie</option>
-            <option value="graph" ${APP_SETTINGS.startView==='graph'?'selected':''}>Graph</option>
-          </select>
-          <div class="text-muted mt-2">Legt fest, welche Dashboard-Visualisierung bevorzugt wird.</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-6">
-      <div class="card admin-card">
-        <div class="card-header"><b>System</b></div>
-        <div class="card-body">
-          <div class="kv">
-            ${kv('Version', BUILD_INFO.version || '-')}
-            ${kv('Build', BUILD_INFO.buildDate || '-')}
-            ${kv('CSV Backend', CSV_BACKEND_AVAILABLE ? 'aktiv' : 'nicht verbunden')}
-            ${kv('Assets', DB.assets.length)}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-function adminSwitch(key,title,desc){
-  const checked = APP_SETTINGS[key] ? 'checked' : '';
-  return `<div class="form-check form-switch admin-switch">
-    <input class="form-check-input" type="checkbox" role="switch" id="set_${key}" ${checked} onchange="setSetting('${key}',this.checked)">
-    <label class="form-check-label" for="set_${key}"><b>${title}</b><br><span class="text-muted">${desc}</span></label>
-  </div>`;
-}
-
-
-function renderDashboardModeSwitch(){
-  return `<div class="btn-group btn-group-sm" role="group">
-    <button class="btn btn-outline-primary" onclick="setDashboardView('graph')">Graph</button>
-    <button class="btn btn-outline-primary" onclick="setDashboardView('topology')">Topologie</button>
-  </div>`;
-}
 let DASHBOARD_VIEW = localStorage.getItem('dashboardView') || APP_SETTINGS.startView || 'topology';
-function setDashboardView(view){
-  DASHBOARD_VIEW = view;
-  localStorage.setItem('dashboardView', view);
-  render();
-}
-function renderDashboardVisual(){
-  if(DASHBOARD_VIEW === 'topology'){
-    return renderTopologyView();
-  }
-
-  return `<div class="asset-graph-wrap">
-      ${renderAssetGraph()}
-    </div>
-    <div class="graph-legend mt-3">
-      <span class="legend-dot legend-asset"></span> Asset
-      <span class="legend-dot legend-hardware"></span> Hardware
-      <span class="legend-dot legend-software"></span> Software
-      <span class="legend-dot legend-network"></span> Netzwerk
-      <span class="legend-dot legend-ticket"></span> Tickets
-      <span class="legend-dot legend-note"></span> Notizen
-    </div>`;
-}
-
-
-function renderDashboard(){
-  return `<div class="row g-3">
-    ${stat('Assets',DB.assets.length,'primary')}
-    ${stat('Hardware',DB.hardware.length,'success')}
-    ${stat('Netzwerk',DB.netzwerk.length,'warning')}
-    ${stat('Software',DB.software.length,'info')}
-    ${stat('Offene Tickets',DB.tickets.filter(t=>t.Status==='Offen').length,'danger')}
-    ${stat('Gelöste Tickets',DB.tickets.filter(t=>t.Status==='Gelöst').length,'success')}
-  </div>
-
-  <div class="card mt-3">
-    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <div>
-        <span>Asset-Übersicht</span>
-        <span class="ms-2">${csvStatusBadge()}</span>
-      </div>
-      <div class="d-flex gap-2 flex-wrap align-items-center">
-        ${renderDashboardModeSwitch()}
-        <button class="btn btn-sm btn-outline-warning" onclick="generateRandomTickets()">Tickets generieren</button>
-        <button class="btn btn-sm btn-outline-primary" onclick="toggleGraphAnimation()">Animation an/aus</button>
-      </div>
-    </div>
-    <div class="card-body">
-      ${renderDashboardVisual()}
-    </div>
-  </div>
-
-  <div class="card mt-3">
-    <div class="card-header">Ticket-Heatmap</div>
-    <div class="card-body">
-      ${renderHeatmap()}
-    </div>
-  </div>`;
-}
-
-
-function renderAssetGraph(){
-  const assets = DB.assets || [];
-  const width = 980, height = 540;
-  const cx = width/2, cy = height/2;
-  let svg = `<svg id="assetGraph" viewBox="0 0 ${width} ${height}" class="asset-graph-svg">`;
-  svg += `<defs>
-    <filter id="nodeShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.25"/>
-    </filter>
-    <radialGradient id="centerGrad"><stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#e9ecef"/></radialGradient>
-  </defs>`;
-  svg += `<circle class="graph-center-pulse" cx="${cx}" cy="${cy}" r="58"></circle>`;
-  svg += `<circle class="graph-center" cx="${cx}" cy="${cy}" r="48"></circle>`;
-  svg += `<text x="${cx}" y="${cy-4}" text-anchor="middle" class="graph-center-title">IT</text>`;
-  svg += `<text x="${cx}" y="${cy+18}" text-anchor="middle" class="graph-center-sub">Assets</text>`;
-
-  assets.forEach((a,i)=>{
-    const angle = (Math.PI*2/assets.length)*i - Math.PI/2;
-    const ax = cx + Math.cos(angle)*250;
-    const ay = cy + Math.sin(angle)*185;
-    const id = a['Asset-ID'];
-    const hw = byAsset('hardware',id).length;
-    const sw = byAsset('software',id).length;
-    const nw = byAsset('netzwerk',id).length;
-    const tk = byAsset('tickets',id).length;
-    const nt = byAsset('notizen',id).length;
-    svg += `<line class="graph-link graph-link-main" x1="${cx}" y1="${cy}" x2="${ax}" y2="${ay}"></line>`;
-    svg += `<g class="asset-node graph-clickable" onclick="openAssetFromGraph('${id}')" style="animation-delay:${i*.15}s">`;
-    svg += `<circle class="node-asset" cx="${ax}" cy="${ay}" r="38"></circle>`;
-    svg += `<text x="${ax}" y="${ay-4}" text-anchor="middle" class="node-title">${escapeHtml(a['Asset-Typ'])}</text>`;
-    svg += `<text x="${ax}" y="${ay+13}" text-anchor="middle" class="node-sub">${escapeHtml(a['Gerätename'])}</text>`;
-    svg += `</g>`;
-
-    const satellites = [
-      {label:'HW '+hw, cls:'hardware', count:hw, da: -0.95},
-      {label:'SW '+sw, cls:'software', count:sw, da: -0.48},
-      {label:'NET '+nw, cls:'network', count:nw, da: 0},
-      {label:'TIC '+tk, cls:'ticket', count:tk, da: 0.48},
-      {label:'NOTE '+nt, cls:'note', count:nt, da: 0.95}
-    ];
-    satellites.forEach((s,j)=>{
-      if(s.count===0) return;
-      const sx = ax + Math.cos(angle+s.da)*82;
-      const sy = ay + Math.sin(angle+s.da)*64;
-      svg += `<line class="graph-link graph-link-${s.cls}" x1="${ax}" y1="${ay}" x2="${sx}" y2="${sy}"></line>`;
-      svg += `<g class="sat-node sat-${s.cls}" style="animation-delay:${(i+j)*.12}s">`;
-      svg += `<circle cx="${sx}" cy="${sy}" r="22"></circle>`;
-      svg += `<text x="${sx}" y="${sy+4}" text-anchor="middle">${s.label}</text>`;
-      svg += `</g>`;
-    });
-  });
-  svg += `</svg>`;
-  return svg;
-}
-function escapeHtml(str){
-  return String(str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-function openAssetFromGraph(assetId){
-  const idx = DB.assets.findIndex(a => a['Asset-ID'] === assetId);
-  if(idx >= 0){
-    selectedIndex.assets = idx;
-    activeKey = 'assets';
-    renderAll();
-  }
-}
-function toggleGraphAnimation(){
-  document.body.classList.toggle('graph-paused');
-}
-function resetGraphView(){
-  render();
-}
-function stat(label,num,color){return `<div class="col-md-4"><div class="card border-${color}"><div class="card-body"><div class="text-muted">${label}</div><div class="display-6 fw-bold">${num}</div></div></div></div>`;}
-function renderStammdaten(){
-  return `
-    <div class="card mb-3 stammdaten-header-card">
-      <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h3 class="mb-1"><i class="bi bi-sliders"></i> Stammdaten</h3>
-          <div class="text-muted">Zentrale Dropdown-Werte verwalten. Änderungen sind sofort in Formularen verfügbar.</div>
-        </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-outline-primary" onclick="reloadStammdaten()"><i class="bi bi-arrow-clockwise"></i> aus *.md neu laden</button>
-          <button class="btn btn-outline-secondary" onclick="exportStammdatenJson()"><i class="bi bi-download"></i> Export</button>
-        </div>
-      </div>
-    </div>
-    <div class="row g-3">
-      ${Object.entries(STAMM).map(([key,arr])=>renderStammCard(key,arr)).join('')}
-    </div>`;
-}
-function renderStammCard(key, arr){
-  return `<div class="col-md-4">
-    <div class="card h-100 stamm-card ${stammCardClass(key)}">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>${stammIcon(key)} <b>${stammTitle(key)}</b> <span class="badge text-bg-secondary">${arr.length}</span></span>
-        <button class="btn btn-sm btn-success" onclick="stammAdd('${key}')"><i class="bi bi-plus-circle"></i> Neu</button>
-      </div>
-      <div class="card-body">
-        <div class="stamm-list">
-          ${arr.map((item,i)=>renderStammItem(key,item,i)).join('')}
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-function renderStammItem(key,item,i){
-  return `<div class="stamm-item">
-    <span class="stamm-value">${escapeHtml(item)}</span>
-    <span class="stamm-actions">
-      <button class="btn btn-sm btn-outline-primary" title="Bearbeiten" onclick="stammEdit('${key}',${i})"><i class="bi bi-pencil"></i></button>
-      <button class="btn btn-sm btn-outline-danger" title="Löschen" onclick="stammDelete('${key}',${i})"><i class="bi bi-trash"></i></button>
-    </span>
-  </div>`;
-}
-function stammTitle(key){
-  const map={assetTypen:'Gerätetypen',status:'Status',standorte:'Standorte',raeume:'Räume',hersteller:'Hersteller',betriebssysteme:'Betriebssysteme',domaenen:'Domänen',netzwerktypen:'Netzwerktypen',adressarten:'Adressarten',verbindungstypen:'Verbindungstypen',vlans:'VLANs',switches:'Switch/Ports',accesspoints:'Access Points',ssids:'SSIDs',lizenzstatus:'Lizenzstatus',updateStatus:'Update-Status',kritikalitaet:'Kritikalität',ticketKategorien:'Ticket-Kategorien',prioritaeten:'Prioritäten',ticketStatus:'Ticket-Status',notizKategorien:'Notiz-Kategorien',tags:'Tags'};
-  return map[key]||key;
-}
-function stammIcon(key){
-  const map={assetTypen:'<i class="bi bi-pc-display-horizontal text-primary"></i>',status:'<i class="bi bi-toggles text-secondary"></i>',standorte:'<i class="bi bi-building text-success"></i>',raeume:'<i class="bi bi-door-open text-success"></i>',hersteller:'<i class="bi bi-tools text-success"></i>',betriebssysteme:'<i class="bi bi-window text-primary"></i>',domaenen:'<i class="bi bi-diagram-3 text-primary"></i>',netzwerktypen:'<i class="bi bi-hdd-network text-info"></i>',adressarten:'<i class="bi bi-ethernet text-info"></i>',verbindungstypen:'<i class="bi bi-diagram-2 text-info"></i>',vlans:'<i class="bi bi-layers text-info"></i>',switches:'<i class="bi bi-router text-info"></i>',accesspoints:'<i class="bi bi-wifi text-info"></i>',ssids:'<i class="bi bi-broadcast-pin text-info"></i>',lizenzstatus:'<i class="bi bi-key text-purple"></i>',updateStatus:'<i class="bi bi-arrow-repeat text-purple"></i>',kritikalitaet:'<i class="bi bi-exclamation-triangle text-warning"></i>',ticketKategorien:'<i class="bi bi-ticket-detailed text-warning"></i>',prioritaeten:'<i class="bi bi-flag text-warning"></i>',ticketStatus:'<i class="bi bi-check2-square text-warning"></i>',notizKategorien:'<i class="bi bi-stickies text-warning"></i>',tags:'<i class="bi bi-tags text-warning"></i>'};
-  return map[key]||'<i class="bi bi-list-ul"></i>';
-}
-function stammCardClass(key){
-  if(['assetTypen','hersteller','betriebssysteme'].includes(key)) return 'stamm-hardware';
-  if(['lizenzstatus','updateStatus','kritikalitaet'].includes(key)) return 'stamm-software';
-  if(['netzwerktypen','adressarten','verbindungstypen','vlans','switches','accesspoints','ssids','domaenen'].includes(key)) return 'stamm-network';
-  if(['ticketKategorien','prioritaeten','ticketStatus','notizKategorien','tags'].includes(key)) return 'stamm-support';
-  return 'stamm-default';
-}
-function stammAdd(key){
-  const value=prompt('Neuen Stammdatenwert für "'+stammTitle(key)+'" anlegen:');
-  if(!value||!value.trim()) return;
-  const clean=value.trim();
-  if((STAMM[key]||[]).includes(clean)){alert('Dieser Wert existiert bereits.');return;}
-  if(!STAMM[key]) STAMM[key]=[];
-  STAMM[key].push(clean);
-  toast('Stammdatenwert angelegt.');
-  render();
-}
-function stammEdit(key,index){
-  const oldValue=STAMM[key][index];
-  const value=prompt('Stammdatenwert bearbeiten:', oldValue);
-  if(!value||!value.trim()) return;
-  const clean=value.trim();
-  if(clean!==oldValue&&(STAMM[key]||[]).includes(clean)){alert('Dieser Wert existiert bereits.');return;}
-  STAMM[key][index]=clean;
-  toast('Stammdatenwert geändert.');
-  render();
-}
-function stammDelete(key,index){
-  const value=STAMM[key][index];
-  const usage=getStammUsage(value);
-  if(usage.length){alert('Löschen nicht möglich. Der Wert wird noch verwendet:\\n\\n'+usage.join('\\n'));return;}
-  if(confirm('Stammdatenwert wirklich löschen?\\n\\n'+value)){
-    STAMM[key].splice(index,1);
-    toast('Stammdatenwert gelöscht.');
-    render();
-  }
-}
-function getStammUsage(value){
-  const hits=[];
-  Object.entries(DB).forEach(([table,rows])=>{
-    (rows||[]).forEach(row=>{
-      Object.entries(row).forEach(([field,val])=>{
-        if(String(val)===String(value)){
-          const id=row['Asset-ID']||row['Ticket-ID']||row['Software-ID']||row['Netzwerk-ID']||row['Hardware-ID']||row['Notiz-ID']||row['Knowledge-ID']||'?';
-          hits.push(table+' / '+id+' / '+field);
-        }
-      });
-    });
-  });
-  return hits.slice(0,20);
-}
-function exportStammdatenJson(){
-  const data=JSON.stringify(STAMM,null,2);
-  const blob=new Blob([data],{type:'application/json'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download='stammdaten.json';
-  a.click();
-}
 
 function contextHeader(mod){
   if(!mod.context) return '';
@@ -1333,7 +563,10 @@ function contextHeader(mod){
 
 function toolbar(mod,row,idx){
   if(!row){
-    return `<div class="alert alert-info py-2 mb-2">Keine Treffer im aktuellen Tab.</div>`;
+    return emptyStateFor(mod?.key || activeKey);
+  }
+  if(!canWrite()){
+    return `<div class="alert alert-secondary py-2 mb-2">Normalmodus: Daten können angesehen, aber nicht geändert werden.</div>`;
   }
 
   // v14: Hardware darf nicht separat neu angelegt werden.
@@ -1369,16 +602,103 @@ function toolbar(mod,row,idx){
       <button class="btn btn-outline-primary" onclick="openEdit('${mod.key}',${idx})">Bearbeiten</button>
       <button class="btn btn-outline-danger" onclick="deleteRow('${mod.key}',${idx})">Löschen</button>
       ${extra}
+      ${contextHelpButton(mod.key)}
     </div>`;
 }
 
+function emptyStateFor(key){
+  if(!CSV_BACKEND_AVAILABLE){
+    return `<div class="alert alert-warning py-2 mb-2">CSV Backend nicht verbunden. Starte die App über <b>start.bat</b>, damit lokale Daten geladen und gespeichert werden können.</div>`;
+  }
+  if(String(searchText || '').trim()){
+    return `<div class="alert alert-info py-2 mb-2">Keine Treffer für die aktuelle Suche im Tab <b>${safeEscape(key || 'Daten')}</b>.</div>`;
+  }
+  return `<div class="alert alert-secondary py-2 mb-2">Noch keine Daten im Tab <b>${safeEscape(key || 'Daten')}</b> vorhanden.</div>`;
+}
+
+function contextHelpButton(key){
+  const slug = {
+    assets:'schnellstart',
+    hardware:'checklisten',
+    software:'checklisten',
+    netzwerk:'checklisten',
+    tickets:'faq',
+    notizen:'schnellstart',
+    knowledge:'faq'
+  }[key] || 'schnellstart';
+  return `<button class="btn btn-outline-secondary" onclick="openContextHelp('${slug}')">Hilfe</button>`;
+}
+
+function listFilterFields(key){
+  return {
+    assets:['Status','Standort','Raum','Hersteller'],
+    hardware:['Gerätename'],
+    software:['Hersteller','Update-Status','Kritikalität','Lizenzstatus'],
+    netzwerk:['Netzwerktyp','Adressart','VLAN'],
+    tickets:['Status','Kategorie','Priorität','Gerätename'],
+    notizen:['Status','Kategorie'],
+    knowledge:['Kategorie']
+  }[key] || [];
+}
+
+function listGroupFields(key){
+  return {
+    assets:[['Standort','Standort'],['Raum','Raum']],
+    software:[['Hersteller','Hersteller'],['family','Produktfamilie'],['Update-Status','Update-Status'],['Kritikalität','Kritikalität']],
+    tickets:[['Status','Status'],['Kategorie','Kategorie'],['Priorität','Priorität'],['Gerätename','Asset']]
+  }[key] || [];
+}
+
+function uniqueValues(rows, field){
+  return Array.from(new Set(rows.map(r => String(r[field] || '').trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'de')).slice(0, 18);
+}
+
+function renderListControls(key, sourceRows){
+  const state = listState(key);
+  const fields = listFilterFields(key);
+  const groupFields = listGroupFields(key);
+  if(!fields.length && !groupFields.length) return '';
+  const values = state.filterField ? uniqueValues(sourceRows, state.filterField) : [];
+  return `<div class="card mb-2 list-controls"><div class="card-body d-flex flex-wrap gap-2 align-items-center">
+    <select class="form-select form-select-sm list-select" onchange="setListState('${key}','sort',this.value)">
+      <option value="smart" ${state.sort==='smart'?'selected':''}>Sortierung: Status + Name</option>
+      <option value="name" ${state.sort==='name'?'selected':''}>Sortierung: Name</option>
+      <option value="date" ${state.sort==='date'?'selected':''}>Sortierung: Datum/Garantie</option>
+    </select>
+    <select class="form-select form-select-sm list-select" onchange="setListState('${key}','filterField',this.value);setListState('${key}','filterValue','')">
+      <option value="">Filterfeld</option>
+      ${fields.map(field=>`<option value="${safeEscape(field)}" ${state.filterField===field?'selected':''}>${safeEscape(field)}</option>`).join('')}
+    </select>
+    <select class="form-select form-select-sm list-select" onchange="setListState('${key}','filterValue',this.value)" ${state.filterField?'':'disabled'}>
+      <option value="">Alle Werte</option>
+      ${values.map(value=>`<option value="${safeEscape(value)}" ${state.filterValue===value?'selected':''}>${safeEscape(value)}</option>`).join('')}
+    </select>
+    <select class="form-select form-select-sm list-select" onchange="setListState('${key}','group',this.value)">
+      <option value="none">Keine Gruppierung</option>
+      ${groupFields.map(([field,label])=>`<option value="${safeEscape(field)}" ${state.group===field?'selected':''}>Gruppe: ${safeEscape(label)}</option>`).join('')}
+    </select>
+    <button class="btn btn-sm btn-outline-secondary ${state.savedView==='incomplete'?'active':''}" onclick="setListState('${key}','savedView',listState('${key}').savedView==='incomplete'?'':'incomplete')">Fehlende Pflichtfelder</button>
+    ${key!=='assets'?`<button class="btn btn-sm btn-outline-secondary ${state.savedView==='orphan'?'active':''}" onclick="setListState('${key}','savedView',listState('${key}').savedView==='orphan'?'':'orphan')">Ohne Asset</button>`:''}
+    ${key==='tickets'?`<button class="btn btn-sm btn-outline-secondary ${state.savedView==='open_tickets'?'active':''}" onclick="setListState('${key}','savedView',listState('${key}').savedView==='open_tickets'?'':'open_tickets')">Offene Tickets</button>`:''}
+    ${key==='assets'?`<button class="btn btn-sm btn-outline-secondary ${state.savedView==='scan_unknown'?'active':''}" onclick="setListState('${key}','savedView',listState('${key}').savedView==='scan_unknown'?'':'scan_unknown')">Scan unbekannt</button>`:''}
+    <button class="btn btn-sm btn-outline-secondary" onclick="LIST_STATE['${key}']={sort:'smart',group:'none',filterField:'',filterValue:'',savedView:''};saveListState();render()">Zurücksetzen</button>
+  </div></div>`;
+}
+
+function openContextHelp(slug){
+  if(typeof setHelpArticle === 'function') setHelpArticle(slug);
+  activeKey = 'help';
+  renderAll();
+}
+
 function renderAssets(){
-  const rows = filterRows(DB.assets || []);
+  const sourceRows = DB.assets || [];
+  const rows = filterRows(sourceRows, 'assets');
   const idx = clamp(selectedIndex.assets, rows.length);
   selectedIndex.assets = idx;
   const row = rows[idx] || null;
 
-  const actions = row ? `
+  const actions = row && canWrite() ? `
     <div class="alert alert-info py-2 mb-2">
       Neue Assets werden weiterhin über <b>+ Neues Gerät erfassen</b> erstellt.
       Bestehende Assets können hier bearbeitet oder gelöscht werden.
@@ -1387,18 +707,493 @@ function renderAssets(){
       <button class="btn btn-outline-primary" onclick="openEdit('assets',${idx})">Asset bearbeiten</button>
       <button class="btn btn-outline-danger" onclick="deleteAssetWithReferences(${idx})">Asset löschen</button>
     </div>
-  ` : '';
+  ` : row ? '<div class="alert alert-secondary py-2 mb-2">Normalmodus: Assets können angesehen, aber nicht geändert werden.</div>' : '';
 
-  return actions + renderSplit('assets', rows, assetColumns(), row, renderAssetCard(row, idx, rows.length));
+  return renderListControls('assets', sourceRows) + actions + renderSplit('assets', rows, assetColumns(), row, renderAssetCard(row, idx, rows.length));
 }
 
 // ===== v27 SOFTWARE UI =====
 let SOFTWARE_VIEW = localStorage.getItem('softwareView') || 'cards';
+let SOFTWARE_FULL_SELECTED = 0;
+const SOFTWARE_FULL_SCOPES = ['apps','productivity','admin','development','security','drivers','runtimes','windows','services','unknown','components','system','all'];
+const STORED_SOFTWARE_FULL_SCOPE = localStorage.getItem('softwareFullScope') || 'apps';
+let SOFTWARE_FULL_SCOPE = SOFTWARE_FULL_SCOPES.includes(STORED_SOFTWARE_FULL_SCOPE) ? STORED_SOFTWARE_FULL_SCOPE : 'apps';
+
+const SOFTWARE_FULL_FAMILY_RULES = [
+  {family:'Microsoft Visual C++ Redistributable', category:'component', patterns:[/Microsoft\.VCRedist/i,/Visual C\+\+/i,/VCLibs/i]},
+  {family:'.NET Runtime', category:'component', patterns:[/Microsoft\.DotNet/i,/\.NET Host/i,/\.NET Runtime/i,/ASP\.NET Core/i,/Windows Desktop Runtime/i,/NET\.Native/i]},
+  {family:'Windows App Runtime', category:'component', patterns:[/WindowsAppRuntime/i,/WinAppRuntime/i]},
+  {family:'Microsoft VCLibs', category:'component', patterns:[/^VCLibs/i,/Microsoft\.VCLibs/i]},
+  {family:'Python', category:'app', patterns:[/^Python\s+\d/i,/Python Launcher/i,/^pip$/i,/^pipx$/i]},
+  {family:'Adobe Acrobat', category:'app', patterns:[/Acrobat/i,/Adobe Refresh Manager/i,/Adobe Notification Client/i,/AdobeAcrobat/i,/AdobeUpdateService/i]},
+  {family:'Adobe Creative Cloud', category:'app', patterns:[/Adobe Creative Cloud/i]},
+  {family:'Microsoft Office', category:'app', patterns:[/Microsoft Office/i,/MicrosoftOfficeHub/i,/Office 16 Click-to-Run/i,/OfficePushNotification/i]},
+  {family:'LibreOffice', category:'app', patterns:[/LibreOffice/i,/^soffice$/i]},
+  {family:'Microsoft Edge', category:'app', patterns:[/^Microsoft Edge$/i,/MicrosoftEdge\.Stable/i,/Edge\.GameAssist/i,/Microsoft Edge-Spielhilfe/i]},
+  {family:'Microsoft Edge WebView2', category:'component', patterns:[/WebView2/i]},
+  {family:'Visual Studio Code', category:'app', patterns:[/Visual Studio Code/i,/VisualStudioCode/i,/^Code$/i,/VS Code/i]},
+  {family:'Microsoft Visual Studio', category:'app', patterns:[/Visual Studio Installer/i,/Visual Studio Setup/i,/Visual Studio Installer Elevation Service/i]},
+  {family:'Chocolatey', category:'app', patterns:[/^chocolatey$/i,/Chocolatey/i]},
+  {family:'7-Zip', category:'app', patterns:[/^7-Zip/i,/^7zFM$/i]},
+  {family:'AOMEI Backupper', category:'app', patterns:[/AOMEI Backupper/i]},
+  {family:'Google Chrome', category:'app', patterns:[/^Google Chrome$/i,/^Chrome$/i,/GoogleChromeElevationService/i]},
+  {family:'Google Updater', category:'component', patterns:[/Google Updater/i]},
+  {family:'Google Earth Pro', category:'app', patterns:[/Google Earth Pro/i]},
+  {family:'Macrium Reflect', category:'app', patterns:[/Macrium Reflect/i,/Macrium Service/i]},
+  {family:'Microsoft Teams', category:'app', patterns:[/^MSTeams$/i,/Microsoft Teams/i]},
+  {family:'PowerToys', category:'app', patterns:[/PowerToys/i]},
+  {family:'VLC media player', category:'app', patterns:[/^vlc$/i,/VLC media player/i]},
+  {family:'WinSCP', category:'app', patterns:[/^WinSCP/i]},
+  {family:'AnyToISO', category:'app', patterns:[/AnyToISO/i]},
+  {family:'Git', category:'app', patterns:[/^Git$/i,/Git\.Git/i]},
+  {family:'ShareX', category:'app', patterns:[/ShareX/i]},
+  {family:'WhatsApp', category:'app', patterns:[/WhatsApp/i]},
+  {family:'Notepad++', category:'app', patterns:[/notepad\+\+/i,/Notepad\+\+/i]},
+  {family:'Sysinternals', category:'app', patterns:[/SysInternals/i,/Sysinternals/i]},
+  {family:'ChatGPT', category:'app', patterns:[/^ChatGPT/i]},
+  {family:'PowerShell', category:'app', patterns:[/^PowerShell\s*7/i]},
+  {family:'OneDrive', category:'app', patterns:[/OneDrive/i]},
+  {family:'Mozilla Firefox', category:'app', patterns:[/^firefox$/i,/Mozilla Firefox/i]},
+  {family:'PuTTY', category:'app', patterns:[/^putty$/i,/PuTTY release/i]},
+  {family:'Zoom Workplace', category:'app', patterns:[/^Zoom$/i,/Zoom Workplace/i]},
+  {family:'IntelliJ IDEA Community', category:'app', patterns:[/IntelliJ IDEA Community/i]},
+  {family:'Unity', category:'app', patterns:[/^Unity\s+\d/i,/Unity Hub/i]},
+  {family:'Windows ADK', category:'component', patterns:[/Application Compatibility Toolkit/i,/Assessment/i,/Assessment and Deployment Kit/i,/WindowsADK/i,/Deployment Image Servicing/i,/Imaging (And )?(Configuration )?Designer/i,/Imaging Tools Support/i,/User State Migration Tool/i,/BCD and Boot/i,/DefaultPackMSI/i,/Kits Configuration Installer/i,/OA3Tool/i,/OACheck/i,/OATool/i,/Oscdimg/i,/Supply Chain Trust Tools ADK/i,/Toolkit Documentation/i,/UEV Tools/i,/Volume Activation Management Tool/i,/Windows Assessment Toolkit/i,/Windows Deployment/i,/Windows PE/i,/Windows Setup Files/i,/Windows System Image Manager/i,/WPT/i]},
+  {family:'Sophos Endpoint Security', category:'component', patterns:[/^Sophos/i]},
+  {family:'Brother Drucker/Scanner Suite', category:'app', patterns:[/^Brother/i,/^Br[A-Z]/i,/ControlCenter4/i,/StatusMonitor/i,/UsbRepairTool/i,/NetworkRepairTool/i,/HowToGuide/i,/AppLogLibSetup/i]},
+  {family:'Paragon Partition Manager', category:'app', patterns:[/Paragon Partition Manager/i,/Paragon Block Device Mounter/i]},
+  {family:'Canon Druckertreiber', category:'component', patterns:[/Canon.*Druckertreiber/i,/Canon Generic Plus/i]},
+  {family:'Fujitsu DeskUpdate', category:'app', patterns:[/DeskUpdate/i]},
+  {family:'Epic Online Services', category:'component', patterns:[/Epic Online Services/i]},
+  {family:'GLPI Agent', category:'component', patterns:[/GLPI Agent/i]},
+  {family:'Mozilla Maintenance Service', category:'component', patterns:[/Mozilla Maintenance Service/i]},
+  {family:'Windows Subsystem for Linux', category:'app', patterns:[/Windows Subsystem for Linux/i,/Windows-Subsystem für Linux/i]},
+  {family:'Microsoft XNA Framework', category:'component', patterns:[/XNA Framework/i,/Microsoft\.XNARedist/i]},
+  {family:'Windows Medienerweiterungen', category:'system', patterns:[/AV1 ?Video Extension/i,/AV1VideoExtension/i,/AVC ?Encoder/i,/AVCEncoderVideoExtension/i,/HEIF/i,/HEVC/i,/MPEG-?2/i,/MPEG2VideoExtension/i,/Raw Image Extension/i,/RawImageExtension/i,/VP9/i,/WebMediaExtensions/i,/Webmedienerweiterungen/i,/WebP/i,/WebpImageExtension/i]},
+  {family:'Windows Xbox/Gaming Apps', category:'system', patterns:[/^Xbox$/i,/XboxGame/i,/XboxGaming/i,/XboxIdentity/i,/XboxSpeech/i,/Game Bar/i,/Game Speech Window/i,/GamingApp/i,/Solitaire/i,/MicrosoftSolitaireCollection/i]},
+  {family:'Windows Store Apps', category:'system', patterns:[/Microsoft Store/i,/WindowsStore/i,/StorePurchaseApp/i,/DesktopAppInstaller/i,/Host der Store-Benutzeroberfläche/i]},
+  {family:'Windows Standard-Apps', category:'system', patterns:[/BingNews/i,/BingSearch/i,/BingWeather/i,/Microsoft Bing/i,/Microsoft Fotos/i,/Fotos/i,/Photos/i,/WindowsCamera/i,/Windows-Kamera/i,/WindowsCalculator/i,/Windows-Rechner/i,/WindowsAlarms/i,/Windows-Uhr/i,/WindowsSoundRecorder/i,/Windows-Audiorekorder/i,/WindowsNotepad/i,/Windows-Editor/i,/WindowsFeedbackHub/i,/Feedback-Hub/i,/WindowsMaps/i,/Windows-Karten/i,/GetHelp/i,/Hilfe anfordern/i,/Getstarted/i,/People/i,/Microsoft Kontakte/i,/Todos/i,/Microsoft To Do/i,/OutlookForWindows/i,/Outlook for Windows/i,/Paint$/i,/ScreenSketch/i,/Snipping Tool/i,/ZuneMusic/i,/ZuneVideo/i,/Filme & TV/i,/Windows Medienwiedergabe/i,/Mail und Kalender/i,/windowscommunicationsapps/i,/Smartphone-Link/i,/Geräteübergreifender Funktions-Host/i,/Power Automate/i,/PowerAutomate/i]},
+  {family:'Windows Shell/Experience', category:'system', patterns:[/ApplicationCompatibilityEnhancements/i,/CrossDevice/i,/DevHome/i,/LanguageExperiencePack/i,/Deutsch Local Experience Pack/i,/NcsiUwpApp/i,/QuickAssist/i,/Remotehilfe/i,/SecHealthUI/i,/Services\.Store\.Engagement/i,/Start Experiences-App/i,/StartExperiencesApp/i,/WidgetsPlatformRuntime/i,/Windows Advanced Settings/i,/Windows Web Experience Pack/i,/Winget\.(Fonts\.)?Source/i]}
+];
+
+const SOFTWARE_FULL_SYSTEM_PATTERNS = [
+  /^Microsoft\.Windows/i,
+  /^Windows\./i,
+  /^Microsoft\.(AAD|AccountsControl|AsyncTextService|BioEnrollment|CredentialDialogHost|LockApp|SecHealthUI|WindowsStore)/i,
+  /^(StartExperiencesApp|CrossDevice|YourPhone|Xbox\.|Xbox TCUI|Clipchamp|Copilot|Microsoft 365 Copilot|Microsoft Search in Bing|App-Installer|Windows Installer)$/i,
+  /^(Speion|Voiess)$/i
+];
 
 function setSoftwareView(view){
   SOFTWARE_VIEW = view;
   localStorage.setItem('softwareView', view);
   render();
+}
+
+function setSoftwareFullSelected(i){
+  SOFTWARE_FULL_SELECTED = i;
+  render();
+}
+
+function setSoftwareFullScope(scope){
+  SOFTWARE_FULL_SCOPE = SOFTWARE_FULL_SCOPES.includes(scope) ? scope : 'apps';
+  SOFTWARE_FULL_SELECTED = 0;
+  localStorage.setItem('softwareFullScope', SOFTWARE_FULL_SCOPE);
+  render();
+}
+
+function softwareFullBaseRows(){
+  const full = DB.softwareFull || {};
+  const rows = Array.isArray(full.rows) ? full.rows : [];
+  const q = searchText.trim().toLowerCase();
+  return rows
+    .filter(r=>!q || Object.values(r).join(' ').toLowerCase().includes(q))
+    .filter(r=>String(r.Name || '').trim() && String(r.Name || '').trim() !== '-');
+}
+
+function softwareFullRows(){
+  const filtered = softwareFullBaseRows()
+    .filter(r=>{
+      const category = softwareFullCategory(r);
+      const swClass = softwareFullClass(r);
+      if(SOFTWARE_FULL_SCOPE === 'all') return true;
+      if(SOFTWARE_FULL_SCOPE === 'apps') return category === 'app';
+      if(SOFTWARE_FULL_SCOPE === 'productivity') return swClass === 'productivity';
+      if(SOFTWARE_FULL_SCOPE === 'admin') return swClass === 'admin';
+      if(SOFTWARE_FULL_SCOPE === 'development') return swClass === 'development';
+      if(SOFTWARE_FULL_SCOPE === 'security') return swClass === 'security';
+      if(SOFTWARE_FULL_SCOPE === 'drivers') return swClass === 'driver';
+      if(SOFTWARE_FULL_SCOPE === 'runtimes') return swClass === 'runtime';
+      if(SOFTWARE_FULL_SCOPE === 'windows') return swClass === 'windows';
+      if(SOFTWARE_FULL_SCOPE === 'services') return swClass === 'service';
+      if(SOFTWARE_FULL_SCOPE === 'unknown') return swClass === 'unclear';
+      if(SOFTWARE_FULL_SCOPE === 'components') return category === 'component';
+      if(SOFTWARE_FULL_SCOPE === 'system') return category === 'system';
+      return category === 'app';
+    });
+  return compactSoftwareFullRows(filtered);
+}
+
+function softwareFullCategory(row){
+  const family = softwareFullFamily(row);
+  if(family?.category) return family.category;
+  if(isWindowsSystemSoftware(row)) return 'system';
+  if(isSoftwareComponent(row)) return 'component';
+  return 'app';
+}
+
+function isWindowsSystemSoftware(row){
+  const name = String(row.DisplayName || row.Name || '').trim();
+  const publisher = String(row.Publisher || row.Hersteller || '');
+  const packageType = String(row.PackageType || row.Pakettyp || '');
+  const path = String(row.InstallLocation || row.RawPath || row.RawSourceKey || '');
+  const normalizedPath = path.replaceAll('/', '\\').toLowerCase();
+  const source = String(row.Sources || row.Source || row.Quelle || '');
+
+  if(/\b(Service|Driver)\b/i.test(packageType)) return true;
+  if(/CN=Microsoft Windows/i.test(publisher)) return true;
+  if(SOFTWARE_FULL_SYSTEM_PATTERNS.some(pattern=>pattern.test(name))) return true;
+  if(/CN=Microsoft Corporation/i.test(publisher) && /Appx\/MSIX/i.test(packageType) && SOFTWARE_FULL_SYSTEM_PATTERNS.some(pattern=>pattern.test(name))) return true;
+  if(['\\windows\\systemapps\\','\\windows\\winsxs\\','\\windows\\system32\\','\\windows\\syswow64\\'].some(part=>normalizedPath.includes(part))) return true;
+  if(/^(Microsoft\.Windows|Windows\.|Microsoft\.UI\.Xaml|UI\.Xaml|Microsoft\.VCLibs|Microsoft\.NET\.Native|Microsoft\.Services\.Store)/i.test(name)) return true;
+  if(/^Microsoft\.(AAD|AccountsControl|AsyncTextService|BioEnrollment|CredentialDialogHost|LockApp|SecHealthUI|WindowsStore)/i.test(name)) return true;
+  if(/HKEY_USERS_S-1-5-(18|19|20)/i.test(source)) return true;
+  return false;
+}
+
+function isSoftwareComponent(row){
+  const name = String(row.DisplayName || row.Name || '').trim();
+  const publisher = String(row.Publisher || row.Hersteller || '');
+  const packageType = String(row.PackageType || row.Pakettyp || '');
+  const blob = `${name} ${publisher} ${packageType}`.toLowerCase();
+  if(/\b(runtime|redistributable|webview|vclibs|framework|sdk|dependency|library|driver package|hosting bundle|shared framework|desktop runtime|native runtime)\b/i.test(blob)) return true;
+  if(/\b(update service|updater|notification client|refresh manager|helper|maintenance service|crash reporter|telemetry|licensing service|scheduler service)\b/i.test(blob)) return true;
+  if(/^(adobe(acrobaticondccoreapp|notificationclient)|acrobat notification client|adobe notification client|adobe refresh manager)$/i.test(name.replace(/\s+/g, ' ').trim())) return true;
+  return false;
+}
+
+function softwareFullCategoryCounts(rows){
+  return rows.reduce((acc,row)=>{
+    const category = softwareFullCategory(row);
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {app:0, component:0, system:0});
+}
+
+function softwareFullClassCounts(rows){
+  return rows.reduce((acc,row)=>{
+    const swClass = softwareFullClass(row);
+    acc[swClass] = (acc[swClass] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function softwareFullDisplayName(row){
+  let name = String(row.DisplayName || row.Name || '').trim();
+  if(!name) return 'Software';
+  const family = softwareFullFamily({...row, Name:name, DisplayName:''});
+  if(family) return family.family;
+  name = name.replace(/^[A-Z0-9]{4,}\./, '');
+  name = name.replace(/^(Microsoft|Windows)\./, '');
+  name = name.replace(/Desktop$/i, '');
+  name = name.replace(/\s+app$/i, '');
+  const normalizedFamily = softwareFullFamily({...row, Name:name, DisplayName:''});
+  if(normalizedFamily) return normalizedFamily.family;
+  if(/^Chocolatey/i.test(name)) return 'Chocolatey';
+  if(/^Microsoft Visual Studio Code/i.test(name) || /^Visual Studio Code/i.test(name)) return 'Visual Studio Code';
+  if(/^Python\s+\d/i.test(name) && !/^Python Launcher/i.test(name)) return 'Python';
+  if(/^Microsoft Edge$|^MicrosoftEdge\.Stable$/i.test(name)) return 'Microsoft Edge';
+  if(/^Microsoft Office LTSC|^MicrosoftOfficeHub$/i.test(name)) return 'Microsoft Office';
+  if(/^LibreOffice/i.test(name) || /^soffice$/i.test(name)) return 'LibreOffice';
+  const aliasKey = name.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  const aliases = {
+    '7zfm':'7-Zip',
+    '7zip':'7-Zip',
+    'acrord32':'Adobe Acrobat Reader',
+    'acrobatreader':'Adobe Acrobat Reader',
+    'adobeacrobat64bit':'Adobe Acrobat',
+    'adobeacrobat':'Adobe Acrobat',
+    'adobeacrobatdccoreapp':'Adobe Acrobat',
+    'adobeacrobaticondccoreapp':'Adobe Acrobat',
+    'acrobatnotificationclient':'Adobe Acrobat',
+    'adobenotificationclient':'Adobe Acrobat',
+    'adoberefreshmanager':'Adobe Acrobat',
+    'chocolateyinstallonly':'Chocolatey',
+    'chocolateygui':'Chocolatey',
+    'code':'Visual Studio Code',
+    'microsoftvisualstudiocodeuser':'Visual Studio Code',
+    'microsoftvisualstudiocodecli':'Visual Studio Code',
+    'soffice':'LibreOffice',
+    whatsappdesktop:'WhatsApp',
+    whatsapp:'WhatsApp',
+    googlechrome:'Google Chrome',
+    chrome:'Google Chrome',
+    microsoftteams:'Microsoft Teams',
+    teams:'Microsoft Teams'
+  };
+  return aliases[aliasKey] || name.trim();
+}
+
+function softwareFullFamily(row){
+  const name = String(row.DisplayName || row.Name || '').trim();
+  const publisher = String(row.Publisher || row.Hersteller || '').trim();
+  const packageType = String(row.PackageType || row.Pakettyp || '').trim();
+  const source = String(row.Sources || row.Source || row.Quelle || '').trim();
+  const raw = String(row.RawSourceKey || row.RawPath || row.InstallLocation || '').trim();
+  const haystack = `${name} ${publisher} ${packageType} ${source} ${raw}`;
+  const fields = [name, publisher, packageType, source, raw, haystack];
+  return SOFTWARE_FULL_FAMILY_RULES.find(rule=>rule.patterns.some(pattern=>fields.some(value=>pattern.test(value)))) || null;
+}
+
+function softwareFullProductHint(row){
+  const config = DB.softwareClassification || {};
+  const hints = config.productHints || {};
+  const name = String(row.DisplayName || softwareFullDisplayName(row) || '').trim();
+  return hints[name] || {};
+}
+
+function softwareFullClass(row){
+  const hint = softwareFullProductHint(row);
+  if(hint.class) return hint.class;
+  const category = softwareFullCategory(row);
+  const packageType = String(row.PackageType || row.Pakettyp || '').toLowerCase();
+  const name = String(row.DisplayName || row.Name || '').toLowerCase();
+  const publisher = String(row.Publisher || row.Hersteller || '').toLowerCase();
+  if(category === 'system') return 'windows';
+  if(packageType.includes('driver')) return 'driver';
+  if(packageType.includes('service')) return 'service';
+  if(category === 'component') return 'runtime';
+  if(/defender|sophos|security|antivirus|bitlocker|firewall|endpoint/.test(`${name} ${publisher}`)) return 'security';
+  if(/powershell|putty|winscp|sysinternals|chocolatey|uniget|winget|glpi|deskupdate|backup|partition|remote|ssh|scanner/.test(name)) return 'admin';
+  if(/python|git|visual studio|code|intellij|unity|node|npm|java|jdk|sdk/.test(name)) return 'development';
+  if(!publisher || publisher === '-' || String(row.DetectionConfidence || '').toLowerCase() === 'low') return 'unclear';
+  return 'productivity';
+}
+
+function softwareFullClassLabel(row){
+  const labels = (DB.softwareClassification || {}).classLabels || {};
+  const swClass = softwareFullClass(row);
+  return labels[swClass] || swClass || 'Unklar';
+}
+
+function softwareFullRisk(row){
+  const hint = softwareFullProductHint(row);
+  if(hint.risk) return hint.risk;
+  const swClass = softwareFullClass(row);
+  if(['admin','security'].includes(swClass)) return 'high';
+  if(['development','driver','productivity'].includes(swClass)) return 'medium';
+  return 'low';
+}
+
+function softwareFullLabels(row){
+  const hint = softwareFullProductHint(row);
+  const labels = new Set(Array.isArray(hint.labels) ? hint.labels : []);
+  const swClass = softwareFullClass(row);
+  const scope = String(row.Scope || row.BenutzerKontext || '').toLowerCase();
+  const packageType = String(row.PackageType || row.Pakettyp || '').toLowerCase();
+  const confidence = String(row.DetectionConfidence || '').toLowerCase();
+  if(swClass === 'windows') labels.add('Windows-Bordmittel');
+  if(swClass === 'runtime') labels.add('Komponente');
+  if(swClass === 'admin') labels.add('Admin-/IT-Tool');
+  if(swClass === 'development') labels.add('Entwicklung');
+  if(swClass === 'security') labels.add('Security-relevant');
+  if(packageType.includes('portable')) labels.add('Portable');
+  if(scope.includes('user')) labels.add('Benutzerinstallation');
+  if(confidence === 'low' || swClass === 'unclear') labels.add('Pruefen');
+  scannerUncertaintyLabels(row).forEach(label => labels.add(label));
+  return Array.from(labels);
+}
+
+function softwareFullProfileStatus(row){
+  const asset = softwareFullAsset(row);
+  const config = DB.softwareClassification || {};
+  const profiles = config.standardProfiles || {};
+  const type = asset?.['Asset-Typ'] || 'Desktop';
+  const profile = profiles[type] || profiles.Desktop || [];
+  const name = row.DisplayName || softwareFullDisplayName(row);
+  if(!Array.isArray(profile) || !profile.length) return 'Kein Profil';
+  return profile.includes(name) ? 'Standardprofil' : 'Zusatzsoftware';
+}
+
+function softwareFullLogo(row){
+  const hint = softwareFullProductHint(row);
+  if(hint.logo) return hint.logo;
+  const name = String(row.DisplayName || softwareFullDisplayName(row) || '').trim();
+  return name.split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'SW';
+}
+
+function softwareFullLogoPath(row){
+  const hint = softwareFullProductHint(row);
+  return hint.logoPath || '';
+}
+
+function renderSoftwareFullLogo(row, size='list'){
+  const path = softwareFullLogoPath(row);
+  const text = softwareFullLogo(row);
+  const title = row.DisplayName || softwareFullDisplayName(row);
+  if(path){
+    return `<span class="software-logo-mark software-logo-${size}" title="${safeEscape(title)}"><img src="${safeEscape(path)}" alt="${safeEscape(title)} Logo" onerror="this.style.display='none';this.parentNode.classList.add('logo-fallback');this.parentNode.dataset.logo='${safeEscape(text)}';"></span>`;
+  }
+  return `<span class="software-logo-mark software-logo-${size} logo-fallback" data-logo="${safeEscape(text)}" title="${safeEscape(title)}"></span>`;
+}
+
+function softwareFullUpdateAssessment(row){
+  const normalized = normalizeUpdateStatus(row);
+  if(normalized === 'UpdateAvailable'){
+    const latest = row.LatestVersion ? ` -> ${row.LatestVersion}` : '';
+    return `Update verfuegbar${latest} (${row.UpdateSource || 'Quelle unbekannt'})`;
+  }
+  if(normalized === 'Current') return 'Aktuell';
+  if(normalized === 'Error') return 'Update-Pruefung fehlerhaft';
+  if(normalized === 'Unknown') return 'Update unbekannt';
+  if(row.UpdateStatus === 'NoUpdateKnown') return 'Kein Update aus Quellen bekannt';
+  if(normalized === 'NotChecked') return 'Update nicht geprüft';
+  const source = String(row.Sources || row.Source || row.Quelle || '').toLowerCase();
+  const swClass = softwareFullClass(row);
+  if(swClass === 'windows' || swClass === 'runtime') return 'System-/Komponentenpflege';
+  if(source.includes('winget')) return 'Winget erkannt, Upgrade-Abgleich möglich';
+  if(source.includes('choco')) return 'Chocolatey erkannt, Upgrade-Abgleich möglich';
+  if(source.includes('pip') || source.includes('npm')) return 'Paketmanager erkannt, Version prüfen';
+  return 'Manuell prüfen';
+}
+
+function normalizeUpdateStatus(row){
+  const raw = String(row.UpdateStatus || row['Update-Status'] || '').toLowerCase();
+  const available = String(row.UpdateAvailable || '').toLowerCase();
+  if(available === 'true' || raw.includes('available') || raw.includes('verfüg') || raw.includes('verfueg')) return 'UpdateAvailable';
+  if(raw.includes('current') || raw.includes('aktuell') || raw.includes('ok')) return 'Current';
+  if(raw.includes('error') || raw.includes('fehler') || raw.includes('warn')) return 'Error';
+  if(raw.includes('notchecked') || raw.includes('not checked') || raw.includes('nicht geprüft') || raw.includes('nicht gepr')) return 'NotChecked';
+  if(raw.includes('unknown') || raw.includes('unbekannt')) return 'Unknown';
+  return raw ? 'Unknown' : 'NotChecked';
+}
+
+function scannerUncertaintyLabels(row){
+  const labels = [];
+  const type = String(row['Asset-Typ'] || row.DeviceType || '').trim().toLowerCase();
+  const connection = String(row.Verbindungstyp || row.ConnectionType || '').trim().toLowerCase();
+  const blob = Object.values(row || {}).join(' ').toLowerCase();
+  if(type === 'desktop') labels.push('Typ Desktop pruefen');
+  if(connection === '' || connection === 'lan/wlan') labels.push('Verbindung unsicher');
+  if(/to be filled|system product name|o\.e\.m\.|oem|default string|not specified|unknown/i.test(blob)) labels.push('OEM-Platzhalter');
+  return labels;
+}
+
+function softwareFullSourceTrust(row){
+  const source = String(row.Sources || row.Source || row.Quelle || row.PackageType || row.Pakettyp || '').toLowerCase();
+  if(source.includes('winget') || source.includes('registry')) return {level:'hoch', text:'Hohe Verlässlichkeit'};
+  if(source.includes('appx') || source.includes('msix') || source.includes('choco')) return {level:'mittel', text:'Mittlere Verlässlichkeit'};
+  if(source.includes('pip') || source.includes('npm') || source.includes('service') || source.includes('driver')) return {level:'niedrig', text:'Technischer Kontext, fachlich prüfen'};
+  return {level:'unklar', text:'Quelle unbekannt'};
+}
+
+function softwareFullVersion(row){
+  const raw = String(row.Version || '').trim();
+  const matches = raw.match(/[0-9]+(?:\.[0-9A-Za-z-]+)+/g);
+  return matches && matches.length ? matches[matches.length - 1] : raw;
+}
+
+function softwareFamilyParts(row){
+  const name = String(row.DisplayName || row.Softwarename || row.Name || '').trim();
+  const source = String(row.Sources || row.Source || row.Quelle || row.PackageType || '').trim();
+  const version = softwareFullVersion(row);
+  const family = name
+    .replace(/\b\d+(?:\.\d+)+\b/g, '')
+    .replace(/\b(x64|x86|64-bit|32-bit|deutsch|german|english)\b/ig, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return {family: family || name, version, source};
+}
+
+function compactSoftwareFullRows(rows){
+  const groups = new Map();
+  rows.forEach(row=>{
+    const displayName = softwareFullDisplayName(row);
+    const version = softwareFullVersion(row);
+    const category = softwareFullCategory(row);
+    const key = softwareFullGroupKey(row, displayName, version, category);
+    if(!groups.has(key)){
+      groups.set(key, {...row, DisplayName:displayName, Version:version, EntryCount:1, SoftwareCategory:category, RawNames:[row.Name].filter(Boolean), ComponentDetails:[row]});
+      const created = groups.get(key);
+      created.UpdateStatus = created.UpdateStatus || "NoUpdateKnown";
+      created.UpdateAvailable = created.UpdateAvailable || "False";
+      created.InstalledVersion = created.InstalledVersion || version || "";
+      created.LatestVersion = created.LatestVersion || "";
+      created.UpdateSource = created.UpdateSource || "";
+      created.UpdateRaw = created.UpdateRaw || "";
+      created.UpdateCheckedAt = created.UpdateCheckedAt || "";
+      return;
+    }
+    const existing = groups.get(key);
+    existing.EntryCount += 1;
+    existing.ComponentDetails.push(row);
+    if(row.Name && !existing.RawNames.includes(row.Name)) existing.RawNames.push(row.Name);
+    existing.Sources = mergeCsvValues(existing.Sources || existing.Source || existing.Quelle, row.Sources || row.Source || row.Quelle);
+    existing.Quelle = existing.Sources;
+    existing.PackageType = mergeCsvValues(existing.PackageType || existing.Pakettyp, row.PackageType || row.Pakettyp);
+    existing.Pakettyp = existing.PackageType;
+    existing.Scope = mergeCsvValues(existing.Scope || existing.BenutzerKontext, row.Scope || row.BenutzerKontext);
+    existing.BenutzerKontext = existing.Scope;
+    if(!existing.Publisher && (row.Publisher || row.Hersteller)) existing.Publisher = row.Publisher || row.Hersteller;
+    if(!existing.Hersteller && (row.Hersteller || row.Publisher)) existing.Hersteller = row.Hersteller || row.Publisher;
+    if(!existing.InstallLocation && row.InstallLocation) existing.InstallLocation = row.InstallLocation;
+    if(!existing.RawPath && row.RawPath) existing.RawPath = row.RawPath;
+    if(!existing.RawSourceKey && row.RawSourceKey) existing.RawSourceKey = row.RawSourceKey;
+    existing.Version = mergeVersionValues(existing.Version, version);
+    if(String(row.UpdateAvailable || '').toLowerCase() === 'true'){
+      existing.UpdateStatus = row.UpdateStatus || 'UpdateAvailable';
+      existing.UpdateAvailable = row.UpdateAvailable;
+      existing.InstalledVersion = row.InstalledVersion || row.Version || existing.InstalledVersion;
+      existing.LatestVersion = row.LatestVersion || existing.LatestVersion;
+      existing.UpdateSource = mergeCsvValues(existing.UpdateSource, row.UpdateSource);
+      existing.UpdateRaw = row.UpdateRaw || existing.UpdateRaw;
+      existing.UpdateCheckedAt = row.UpdateCheckedAt || existing.UpdateCheckedAt;
+    }else{
+      existing.UpdateStatus = existing.UpdateStatus || row.UpdateStatus || 'NoUpdateKnown';
+      existing.UpdateAvailable = existing.UpdateAvailable || row.UpdateAvailable || 'False';
+      existing.InstalledVersion = existing.InstalledVersion || row.InstalledVersion || version || '';
+      existing.LatestVersion = existing.LatestVersion || row.LatestVersion || '';
+      existing.UpdateSource = existing.UpdateSource || row.UpdateSource || '';
+      existing.UpdateCheckedAt = existing.UpdateCheckedAt || row.UpdateCheckedAt || '';
+    }
+    existing.SoftwareCategory = existing.SoftwareCategory || category;
+  });
+  return Array.from(groups.values()).sort((a,b)=>softwareFullDisplayName(a).localeCompare(softwareFullDisplayName(b), 'de'));
+}
+
+function softwareFullGroupKey(row, displayName, version, category){
+  const nameKey = displayName.toLowerCase();
+  const family = softwareFullFamily(row);
+  if(family) return `${category}|family|${family.family.toLowerCase()}`;
+  if(SOFTWARE_FULL_SCOPE === 'apps' && category === 'app') return `app|${nameKey}`;
+  if(/^(Adobe Acrobat|Microsoft Visual C\+\+ Redistributable|Microsoft Edge WebView2|\.NET Runtime|Windows App Runtime|Microsoft VCLibs|Sophos Endpoint Security|Brother Drucker\/Scanner Suite)$/i.test(displayName)) return `${category}|${nameKey}`;
+  return `${category}|${nameKey}|${version.toLowerCase()}`;
+}
+
+function mergeVersionValues(a,b){
+  const values = new Set();
+  String(a || '').split(/\s*,\s*/).forEach(v=>{ if(v) values.add(v); });
+  String(b || '').split(/\s*,\s*/).forEach(v=>{ if(v) values.add(v); });
+  const list = Array.from(values).filter(Boolean).sort();
+  if(list.length > 4) return `${list[0]} ... ${list[list.length - 1]} (${list.length} Versionen)`;
+  return list.join(', ');
+}
+
+function mergeCsvValues(a,b){
+  const parts = new Set();
+  String(a || '').split(/\s*,\s*/).forEach(v=>{ if(v) parts.add(v); });
+  String(b || '').split(/\s*,\s*/).forEach(v=>{ if(v) parts.add(v); });
+  return Array.from(parts).sort().join(', ');
+}
+
+function softwareFullAsset(row){
+  const full = DB.softwareFull || {};
+  const assetId = row?.['Asset-ID'] || full.asset?.['Asset-ID'] || '';
+  const host = row?.['Gerätename'] || full.asset?.['Gerätename'] || '';
+  return (DB.assets || []).find(a =>
+    (assetId && a['Asset-ID'] === assetId) ||
+    (host && String(a['Gerätename']).toLowerCase() === String(host).toLowerCase())
+  ) || null;
 }
 
 function softwareStatusClass(row){
@@ -1431,7 +1226,8 @@ function softwareIcon(row){
 
 function renderSoftwareModern(){
   const mod = modules.find(m=>m.key==='software');
-  const rows = filterRows(DB.software || []);
+  const sourceRows = DB.software || [];
+  const rows = filterRows(sourceRows, 'software');
   const idx = clamp(selectedIndex.software, rows.length);
   selectedIndex.software = idx;
   const row = rows[idx] || rows[0];
@@ -1444,9 +1240,13 @@ function renderSoftwareModern(){
           <div class="text-muted">Wizard-Style Karten, Status-Badges, Knowledge-Hinweise und Asset-Kontext.</div>
         </div>
         <div class="d-flex gap-2 flex-wrap">
+          <div class="btn-group" role="group" aria-label="Softwareansicht">
+            <button class="btn btn-outline-secondary ${SOFTWARE_VIEW==='cards'?'active':''}" onclick="setSoftwareView('cards')">Standardkarten</button>
+            <button class="btn btn-outline-secondary ${SOFTWARE_VIEW==='table'?'active':''}" onclick="setSoftwareView('table')">Tabelle</button>
+            <button class="btn btn-outline-secondary ${SOFTWARE_VIEW==='full'?'active':''}" onclick="setSoftwareView('full')">Full-Scan</button>
+          </div>
           <button class="btn btn-primary" onclick="openSoftwareProfileCreate()">+ Standardsoftware</button>
           <button class="btn btn-outline-primary" onclick="openReferenceCreate('software')">+ Einzelsoftware</button>
-          <button class="btn btn-outline-secondary" onclick="setSoftwareView('${SOFTWARE_VIEW==='cards'?'table':'cards'}')">${SOFTWARE_VIEW==='cards'?'Tabellenansicht':'Kartenansicht'}</button>
         </div>
       </div>
     </div>
@@ -1458,8 +1258,219 @@ function renderSoftwareModern(){
       ${softwareStatCard('Prüfen', rows.filter(r=>softwareStatusClass(r)==='danger').length, 'danger')}
     </div>
 
-    ${SOFTWARE_VIEW==='table' ? renderSplit('software',rows,moduleColumns('software'),row,renderModuleCard(mod,row,idx,rows.length)) : renderSoftwareCardsLayout(rows,row,idx,mod)}
+    ${renderListControls('software', sourceRows)}
+    ${SOFTWARE_VIEW==='full' ? renderSoftwareFullInventory() : SOFTWARE_VIEW==='table' ? renderSplit('software',rows,moduleColumns('software'),row,renderModuleCard(mod,row,idx,rows.length)) : renderSoftwareCardsLayout(rows,row,idx,mod)}
   `;
+}
+
+function renderSoftwareFullInventory(){
+  const full = DB.softwareFull || {};
+  const baseRows = softwareFullBaseRows();
+  const categoryCounts = softwareFullCategoryCounts(baseRows);
+  const classCounts = softwareFullClassCounts(baseRows);
+  const rows = softwareFullRows();
+  SOFTWARE_FULL_SELECTED = clamp(SOFTWARE_FULL_SELECTED, rows.length);
+  const row = rows[SOFTWARE_FULL_SELECTED] || rows[0];
+  const sources = full.sourcesStatus || {};
+  const okCount = Object.values(sources).filter(v=>String(v).startsWith('OK')).length;
+  const warnCount = Object.values(sources).filter(v=>String(v).startsWith('WARN')).length;
+  const skippedCount = Object.values(sources).filter(v=>String(v).startsWith('SKIPPED')).length;
+  if(!full.available){
+    return `<div class="card"><div class="card-body">
+      <h5>Full-Software-Scan</h5>
+      <p class="text-muted mb-3">Es wurde noch keine ` + '`software_full.json`' + ` geladen. Starte im Admin Panel den Full-Software-Scan und lade danach die Seite neu.</p>
+      <button class="btn btn-outline-primary" onclick="startScanner('software_full')">Full-Software-Scan starten</button>
+    </div></div>`;
+  }
+  return `<div class="row g-3">
+    <div class="col-12">
+      <div class="card software-full-summary">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h5 class="mb-1">Full-Software-Inventar</h5>
+            <div class="text-muted">${safeEscape(full.asset?.['Gerätename'] || full.scannerContext?.CurrentUser || 'lokaler Scan')} · ${rows.length} angezeigte Einträge · ${categoryCounts.app} Anwendungen · ${categoryCounts.component} Komponenten · ${categoryCounts.system} System · ${classCounts.unclear || 0} unklare Funde</div>
+          </div>
+          <div class="software-source-pills">
+            ${softwareFullScopeButton('apps','Anwendungen',categoryCounts.app)}
+            ${softwareFullScopeButton('productivity','Produktiv',classCounts.productivity)}
+            ${softwareFullScopeButton('admin','Admin/IT',classCounts.admin)}
+            ${softwareFullScopeButton('development','Entwicklung',classCounts.development)}
+            ${softwareFullScopeButton('security','Security',classCounts.security)}
+            ${softwareFullScopeButton('drivers','Treiber',classCounts.driver)}
+            ${softwareFullScopeButton('runtimes','Runtimes',classCounts.runtime)}
+            ${softwareFullScopeButton('windows','Windows',classCounts.windows)}
+            ${softwareFullScopeButton('services','Dienste',classCounts.service)}
+            ${softwareFullScopeButton('unknown','Unklar',classCounts.unclear)}
+            ${softwareFullScopeButton('all','Alle',baseRows.length)}
+            <span class="badge text-bg-success">${okCount} OK</span>
+            <span class="badge text-bg-warning">${warnCount} Warnung</span>
+            <span class="badge text-bg-secondary">${skippedCount} übersprungen</span>
+            <span class="badge text-bg-primary">${safeEscape(full.scannerContext?.ScanMode || '-')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Inventar-Karten</span>
+          <span class="badge text-bg-secondary">${rows.length}</span>
+        </div>
+        <div class="card-body software-card-list">
+          ${rows.length ? rows.map((r,i)=>renderSoftwareFullListCard(r,i)).join('') : '<div class="text-muted">Keine Full-Scan-Einträge passend zur Suche.</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      ${row ? renderSoftwareFullDetailCard(row, SOFTWARE_FULL_SELECTED, rows.length) : '<div class="card"><div class="card-body text-muted">Kein Eintrag ausgewählt.</div></div>'}
+    </div>
+  </div>`;
+}
+
+function softwareFullScopeButton(scope,label,count){
+  return `<button class="btn btn-sm btn-outline-secondary ${SOFTWARE_FULL_SCOPE===scope?'active':''}" onclick="setSoftwareFullScope('${scope}')">${label} <span class="badge text-bg-light">${count || 0}</span></button>`;
+}
+
+function renderSoftwareFullListCard(r,i){
+  const active = i === SOFTWARE_FULL_SELECTED ? 'active' : '';
+  const hasUpdate = String(r.UpdateAvailable || '').toLowerCase() === 'true';
+  const cls = hasUpdate ? 'danger' : String(r.ScanStatus || '').startsWith('OK') ? 'success' : 'warning';
+  const risk = softwareFullRisk(r);
+  const riskCls = risk === 'high' ? 'danger' : risk === 'medium' ? 'warning' : 'secondary';
+  return `<div class="software-list-card ${active}" onclick="setSoftwareFullSelected(${i})">
+    <div class="software-list-icon" title="${safeEscape(r.DisplayName || softwareFullDisplayName(r))}">${renderSoftwareFullLogo(r, 'list')}</div>
+    <div class="software-list-main">
+      <div class="software-list-title">${safeEscape(r.DisplayName || softwareFullDisplayName(r))}</div>
+      <div class="software-list-sub">${safeEscape(r.Publisher || r.Hersteller || '-')} · ${safeEscape(softwareFullVersion(r) || '-')}</div>
+      <div class="software-list-asset">${safeEscape(softwareFullClassLabel(r))} · ${safeEscape(r.PackageType || r.Pakettyp || '-')} · ${safeEscape(r.Sources || r.Source || '-')}</div>
+    </div>
+    <div class="d-flex flex-column align-items-end gap-1">
+      <span class="badge text-bg-${cls}">${hasUpdate ? 'Update' : r.EntryCount>1 ? safeEscape(r.EntryCount + ' Quellen') : safeEscape(r.DetectionConfidence || 'Scan')}</span>
+      <span class="badge text-bg-${riskCls}">${safeEscape(risk.toUpperCase())}</span>
+    </div>
+  </div>`;
+}
+
+function renderSoftwareFullDetailsMenu(row){
+  const details = Array.isArray(row.ComponentDetails) ? row.ComponentDetails : [];
+  if(details.length <= 1) return '';
+  return `<details class="software-full-details mt-3">
+    <summary>${details.length} zusammengeführte Einzelquellen anzeigen</summary>
+    <div class="table-wrap mt-2">
+      <table class="table table-sm">
+        <thead><tr><th>Name</th><th>Version</th><th>Typ</th><th>Quelle</th></tr></thead>
+        <tbody>
+          ${details.map(item=>`<tr>
+            <td>${safeEscape(item.DisplayName || item.Name || '-')}</td>
+            <td>${safeEscape(softwareFullVersion(item) || '-')}</td>
+            <td>${safeEscape(item.PackageType || item.Pakettyp || '-')}</td>
+            <td>${safeEscape(item.Sources || item.Source || item.Quelle || '-')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </details>`;
+}
+
+function softwareFullIcon(row){
+  const type = String(row.PackageType || row.Pakettyp || '').toLowerCase();
+  const name = String(row.DisplayName || row.Name || '').toLowerCase();
+  if(type.includes('driver')) return '🛠️';
+  if(type.includes('service')) return '⚙️';
+  if(type.includes('appx')) return '▣';
+  if(type.includes('pip') || type.includes('npm')) return '{}';
+  if(name.includes('chrome') || name.includes('firefox') || name.includes('edge')) return '🌐';
+  return '◼';
+}
+
+function renderSoftwareFullDetailCard(row,idx,total){
+  const asset = softwareFullAsset(row);
+  const labels = softwareFullLabels(row);
+  const risk = softwareFullRisk(row);
+  const trust = softwareFullSourceTrust(row);
+  const family = softwareFamilyParts(row);
+  const riskCls = risk === 'high' ? 'danger' : risk === 'medium' ? 'warning' : 'secondary';
+  const updateCls = String(row.UpdateAvailable || '').toLowerCase() === 'true' ? 'danger' : 'secondary';
+  return `${navCustom(idx,total,'setSoftwareFullSelected')}
+    <div class="card software-detail-card mt-3">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <div class="software-detail-icon">${renderSoftwareFullLogo(row, 'detail')}</div>
+            <h3 class="mb-1">${safeEscape(row.DisplayName || softwareFullDisplayName(row))}</h3>
+            <span class="badge text-bg-primary">${safeEscape(row.PackageType || row.Pakettyp || 'Scan')}</span>
+            <span class="badge text-bg-secondary">${safeEscape(row.Scope || row.BenutzerKontext || '-')}</span>
+            <span class="badge text-bg-info">${safeEscape(softwareFullClassLabel(row))}</span>
+            <span class="badge text-bg-${riskCls}">Risiko: ${safeEscape(risk)}</span>
+            <span class="badge text-bg-${updateCls}">${safeEscape(row.UpdateStatus || 'Update unbekannt')}</span>
+            <span class="badge text-bg-dark">${safeEscape(softwareFullProfileStatus(row))}</span>
+            <span class="badge text-bg-success">zugeordnet zu: ${safeEscape(asset?.['Gerätename'] || row['Gerätename'] || row['Asset-ID'] || '-')}</span>
+          </div>
+          <button class="btn btn-outline-warning ${asset ? '' : 'd-none'}" onclick="createScannerReviewNote(${idx})">Nacharbeit notieren</button>
+        </div>
+        ${labels.length ? `<div class="mt-3 d-flex flex-wrap gap-1">${labels.map(label=>`<span class="badge text-bg-light">${safeEscape(label)}</span>`).join('')}</div>` : ''}
+        <div class="row mt-4">
+          <div class="col-md-6">
+            <h5>Software</h5>
+            <div class="kv">
+              ${kv('Anwendung',row.DisplayName || softwareFullDisplayName(row))}
+              ${kv('Produktfamilie',family.family)}
+              ${kv('Version',softwareFullVersion(row))}
+              ${kv('Hersteller',normalizeManufacturer(row.Publisher || row.Hersteller))}
+              ${kv('Klasse',softwareFullClassLabel(row))}
+              ${kv('Risiko/Relevanz',risk)}
+              ${kv('Quellenvertrauen',trust.level + ' - ' + trust.text)}
+              ${kv('Normalisierter Update-Status',normalizeUpdateStatus(row))}
+              ${kv('Profil-Abgleich',softwareFullProfileStatus(row))}
+              ${kv('Update-Auswertung',softwareFullUpdateAssessment(row))}
+              ${kv('Installierte Version',row.InstalledVersion || softwareFullVersion(row))}
+              ${kv('Neueste Version',row.LatestVersion || '-')}
+              ${kv('Update-Quelle',row.UpdateSource || '-')}
+              ${kv('Pakettyp',row.PackageType || row.Pakettyp)}
+              ${kv('Quelle',row.Sources || row.Source || row.Quelle)}
+              ${kv('Scope',row.Scope || row.BenutzerKontext)}
+              ${kv('Zusammengeführt',row.EntryCount > 1 ? row.EntryCount + ' Rohquellen' : 'Nein')}
+              ${kv('Confidence',row.DetectionConfidence)}
+              ${kv('Status',row.ScanStatus)}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <h5>Zugeordnetes Asset</h5>
+            <div class="kv">
+              ${kv('Asset-ID',asset?.['Asset-ID'] || row['Asset-ID'])}
+              ${kv('Gerätename',asset?.['Gerätename'] || row['Gerätename'])}
+              ${kv('Typ',asset?.['Asset-Typ'] || '-')}
+              ${kv('Standort',asset ? ((asset.Standort || '-') + ' / ' + (asset.Raum || '-')) : '-')}
+              ${kv('Nutzer',asset?.Hauptnutzer || '-')}
+              ${kv('Status',asset?.Status || '-')}
+            </div>
+          </div>
+        </div>
+        ${renderSoftwareFullAssetSummary(row)}
+        ${renderSoftwareFullDetailsMenu(row)}
+        <div class="software-raw-path mt-3">${safeEscape(row.InstallLocation || row.RawPath || row.RawSourceKey || '')}</div>
+      </div>
+    </div>`;
+}
+
+function renderSoftwareFullAssetSummary(row){
+  const asset = softwareFullAsset(row);
+  if(!asset) return '';
+  const allRows = compactSoftwareFullRows(softwareFullBaseRows().filter(r=>softwareFullAsset(r)?.['Asset-ID'] === asset['Asset-ID'] || softwareFullAsset(r)?.['Gerätename'] === asset['Gerätename']));
+  const counts = allRows.reduce((acc,item)=>{
+    const swClass = softwareFullClass(item);
+    acc[swClass] = (acc[swClass] || 0) + 1;
+    return acc;
+  }, {});
+  return `<div class="alert alert-light mt-3 mb-0">
+    <b>Asset-Softwareprofil:</b>
+    ${allRows.length} verdichtete Einträge,
+    ${(counts.productivity || 0)} Produktiv,
+    ${(counts.admin || 0)} Admin/IT,
+    ${(counts.development || 0)} Entwicklung,
+    ${(counts.security || 0)} Security,
+    ${(counts.unclear || 0)} unklar.
+  </div>`;
 }
 
 function softwareStatCard(title,value,color){
@@ -1520,7 +1531,7 @@ function renderSoftwareDetailCard(row,idx,total,mod){
             <span class="badge text-bg-${cls}">${softwareStatusLabel(row)}</span>
             <span class="badge text-bg-success">zugeordnet zu: ${safeEscape(row['Gerätename']||row['Asset-ID']||'-')}</span>
           </div>
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 ${canWrite() ? '' : 'd-none'}">
             <button class="btn btn-outline-primary" onclick="openEdit('software',${idx})">Bearbeiten</button>
             <button class="btn btn-outline-danger" onclick="deleteRow('software',${idx})">Löschen</button>
           </div>
@@ -1569,6 +1580,7 @@ function softwareKnowledgeHint(row){
 }
 
 function openSoftwareProfileCreate(){
+  if(!requireWriteAccess('Standardsoftware hinzufügen')) return;
   const assets = DB.assets || [];
   const html = `<div class="modal fade" id="softwareProfileModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
     <div class="modal-header"><h5 class="modal-title">Standardsoftware hinzufügen</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -1594,6 +1606,7 @@ function openSoftwareProfileCreate(){
 }
 
 function saveSoftwareProfile(){
+  if(!requireWriteAccess('Standardsoftware speichern')) return;
   const assetId = document.getElementById('profileAsset').value;
   const asset = CORE.findAsset(assetId);
   document.querySelectorAll('.profileSoft:checked').forEach(el=>{
@@ -1618,11 +1631,38 @@ function saveSoftwareProfile(){
   toast('Standardsoftware hinzugefügt.');
 }
 
-function renderLinkedModule(mod){if(mod.key==='software')return renderSoftwareModern();const rows=filterRows(DB[mod.key]||[]);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return contextHeader(mod)+toolbar(mod,row,idx)+renderSplit(mod.key,rows,moduleColumns(mod.key),row,renderModuleCard(mod,row,idx,rows.length));}
-function renderSimpleModule(mod){const rows=filterRows(DB[mod.key]||[]);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return toolbar(mod,row,idx)+renderSplit(mod.key,rows,Object.keys((DB[mod.key]||[])[0]||{}).slice(0,6),row,renderGenericCard(mod,row,idx,rows.length));}
-function renderSplit(key,rows,cols,row,cardHtml){const empty=rows.length===0?`<tr><td colspan="${Math.max(cols.length,1)}" class="text-muted">Keine Treffer</td></tr>`:'';return `<div class="split"><div><div class="card"><div class="card-header">Liste</div><div class="card-body"><div class="table-wrap"><table class="table table-sm table-hover"><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${empty || rows.map((r,i)=>`<tr class="${i===selectedIndex[key]?'active':''}" onclick="selectRow('${key}',${i})">${cols.map(c=>`<td>${val(r,c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div></div></div><div>${cardHtml}</div></div>`;}
+function renderLinkedModule(mod){if(mod.key==='software')return renderSoftwareModern();const sourceRows=DB[mod.key]||[];const rows=filterRows(sourceRows,mod.key);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return contextHeader(mod)+renderListControls(mod.key,sourceRows)+toolbar(mod,row,idx)+renderSplit(mod.key,rows,moduleColumns(mod.key),row,renderModuleCard(mod,row,idx,rows.length));}
+function renderSimpleModule(mod){const sourceRows=DB[mod.key]||[];const rows=filterRows(sourceRows,mod.key);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return renderListControls(mod.key,sourceRows)+toolbar(mod,row,idx)+renderSplit(mod.key,rows,Object.keys((DB[mod.key]||[])[0]||{}).slice(0,6),row,renderGenericCard(mod,row,idx,rows.length));}
+function renderSplit(key,rows,cols,row,cardHtml){
+  const empty = rows.length === 0
+    ? `<tr><td colspan="${Math.max(cols.length,1)}">${emptyStateFor(key)}</td></tr>`
+    : '';
+  return `<div class="split"><div><div class="card"><div class="card-header">Liste</div><div class="card-body"><div class="table-wrap"><table class="table table-sm table-hover data-table"><thead><tr>${cols.map(c=>`<th>${safeEscape(c)}</th>`).join('')}</tr></thead><tbody>${empty || renderGroupedRows(key, rows, cols)}</tbody></table></div></div></div></div><div>${cardHtml}</div></div>`;
+}
+function renderGroupedRows(key, rows, cols){
+  const group = listState(key).group;
+  let last = null;
+  return rows.map((r,i)=>{
+    const current = group && group !== 'none' ? groupValue(key, r, group) : null;
+    const header = current && current !== last ? `<tr class="table-group-row"><td colspan="${Math.max(cols.length,1)}">${safeEscape(current)}</td></tr>` : '';
+    last = current || last;
+    return header + `<tr class="${i===selectedIndex[key]?'active':''}" onclick="selectRow('${key}',${i})">${cols.map(c=>`<td>${formatCell(r,c)}</td>`).join('')}</tr>`;
+  }).join('');
+}
+function groupValue(key,row,group){
+  if(group === 'family') return softwareFamilyParts(row).family || 'Ohne Produktfamilie';
+  return row[group] || 'Ohne Wert';
+}
+function formatCell(row,key){
+  const text = val(row,key);
+  if(!searchText.trim()) return safeEscape(text);
+  const escaped = safeEscape(text);
+  const q = safeEscape(searchText.trim()).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return escaped.replace(new RegExp(q, 'ig'), match => `<mark>${match}</mark>`);
+}
 function selectRow(key,idx){selectedIndex[key]=idx;render();} function prevRow(key){selectedIndex[key]--;render();} function nextRow(key){selectedIndex[key]++;render();}
 function nav(key,idx,total){return `<div class="card"><div class="card-body d-flex justify-content-between align-items-center"><button class="btn btn-outline-primary" onclick="prevRow('${key}')">←</button><b>${total?idx+1:0} / ${total}</b><button class="btn btn-outline-primary" onclick="nextRow('${key}')">→</button></div></div>`;}
+function navCustom(idx,total,setter){return `<div class="card"><div class="card-body d-flex justify-content-between align-items-center"><button class="btn btn-outline-primary" onclick="${setter}(${Math.max(0,idx-1)})">←</button><b>${total?idx+1:0} / ${total}</b><button class="btn btn-outline-primary" onclick="${setter}(${total?Math.min(total-1,idx+1):0})">→</button></div></div>`;}
 function assetColumns(){return ['Asset-ID','Gerätename','Asset-Typ','Standort','Status','Hauptnutzer','Inventarnummer'];}
 function moduleColumns(key){const m={hardware:['Hardware-ID','Asset-ID','Gerätename','CPU','RAM','Speicher'],netzwerk:['Netzwerk-ID','Asset-ID','Gerätename','Adressart','Verbindungstyp','IP-Adresse'],software:['Software-ID','Asset-ID','Gerätename','Softwarename','Version','Lizenzstatus'],tickets:['Ticket-ID','Asset-ID','Gerätename','Titel','Status','Priorität'],notizen:['Notiz-ID','Asset-ID','Gerätename','Titel','Kategorie','Status']};return m[key]||Object.keys((DB[key]||[])[0]||{}).slice(0,6);}
 
@@ -1651,8 +1691,84 @@ function displayFieldLabel(moduleKey, field){
   return (map[moduleKey] && map[moduleKey][field]) ? map[moduleKey][field] : field;
 }
 
-function kv(k,v){return `<div class="k">${k}</div><div>${v}</div>`;} function small(title,body){return `<div class="card mini-card"><div class="card-body"><b>${title}</b><div class="preline mt-2">${body||'-'}</div></div></div>`;}
-function renderAssetCard(a,idx,total){if(!a)return '<div class="card"><div class="card-body">Keine Daten</div></div>';const id=a['Asset-ID'];const hw=firstByAsset('hardware',id),net=firstByAsset('netzwerk',id),sw=byAsset('software',id),tic=byAsset('tickets',id),note=byAsset('notizen',id);return `${nav('assets',idx,total)}<div class="card mt-3"><div class="card-body"><div class="detail-title">${val(a,'Gerätename')}</div><span class="badge text-bg-primary">${val(a,'Asset-Typ')}</span> <span class="badge text-bg-success">${val(a,'Status')}</span><div class="row mt-3"><div class="col"><div class="kv">${kv('Asset-ID',id)}${kv('Standort',val(a,'Standort'))}${kv('Raum',val(a,'Raum'))}${kv('Hauptnutzer',val(a,'Hauptnutzer'))}</div></div><div class="col"><div class="kv">${kv('Hersteller',val(a,'Hersteller'))}${kv('Modell',val(a,'Modell'))}${kv('Betriebssystem',val(a,'Betriebssystem'))}${kv('Inventar',val(a,'Inventarnummer'))}</div></div></div></div></div><div class="row g-2 mt-1"><div class="col-md-4">${small('Hardware ('+(hw?1:0)+')',hw?`CPU: ${hw.CPU}\nRAM: ${hw.RAM}\nSpeicher: ${hw.Speicher}`:'-')}</div><div class="col-md-4">${small('Netzwerk ('+(net?1:0)+')',net?`Adressart: ${net.Adressart}\nIP: ${net['IP-Adresse']||'(DHCP)'}\n${net.Verbindungstyp}`:'-')}</div><div class="col-md-4">${small('Software ('+sw.length+')',sw.map(s=>s.Softwarename).join('\n'))}</div></div><div class="row g-2 mt-1"><div class="col-md-6">${small('Tickets ('+tic.length+')',tic.map(t=>t.Titel+' ['+t.Status+']').join('\n'))}</div><div class="col-md-6">${small('Notizen ('+note.length+')',note.map(n=>n.Titel).join('\n'))}</div></div>`;}
+function kv(k,v){
+  const value = (v === undefined || v === null || v === '') ? '-' : v;
+  return `<div class="k">${safeEscape(k)}</div><div>${safeEscape(value)}</div>`;
+}
+function small(title,body){return `<div class="card mini-card"><div class="card-body"><b>${title}</b><div class="preline mt-2">${body||'-'}</div></div></div>`;}
+function setAssetDetailTab(tab){ASSET_DETAIL_TAB=tab;render();}
+function assetTabButton(key,label,count){
+  const active = ASSET_DETAIL_TAB === key ? 'active' : '';
+  const suffix = count === undefined ? '' : ` <span class="badge text-bg-light text-dark">${count}</span>`;
+  return `<button class="nav-link ${active}" onclick="setAssetDetailTab('${key}')">${label}${suffix}</button>`;
+}
+function assetRowsTable(rows, columns){
+  if(!rows.length) return '<div class="text-muted">Keine Einträge vorhanden.</div>';
+  return `<div class="table-responsive"><table class="table table-sm table-striped mb-0"><thead><tr>${columns.map(c=>`<th>${safeEscape(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${columns.map(c=>`<td>${safeEscape(row[c] || '-')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function renderAssetHistory(a, related){
+  const entries = [];
+  if(a.Status) entries.push({type:'Status', text:a.Status});
+  related.tickets.forEach(t=>entries.push({type:'Ticket', text:`${t.Titel || t['Ticket-ID']} [${t.Status || '-'}]`}));
+  related.notes.forEach(n=>entries.push({type:'Notiz', text:n.Titel || n['Notiz-ID']}));
+  related.software.forEach(s=>entries.push({type:'Software', text:s.Softwarename || s['Software-ID']}));
+  if(!entries.length) return '<div class="text-muted">Noch keine Historienpunkte ableitbar.</div>';
+  return `<ul class="list-group list-group-flush">${entries.map(entry=>`<li class="list-group-item d-flex justify-content-between gap-3"><span>${safeEscape(entry.text)}</span><span class="badge text-bg-secondary">${safeEscape(entry.type)}</span></li>`).join('')}</ul>`;
+}
+function renderAssetWorkflowActions(a){
+  const assetArg = encodeURIComponent(a['Asset-ID'] || '');
+  return `<div class="asset-workflow-actions d-flex flex-wrap gap-2 mt-3">
+    <button class="btn btn-sm btn-primary" onclick="openTicketFromAsset(decodeURIComponent('${assetArg}'))">Ticket aus Asset</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="createAssetWorkflowNote(decodeURIComponent('${assetArg}'),'move')">Umzug planen</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="createAssetWorkflowNote(decodeURIComponent('${assetArg}'),'retire')">Ausmusterung planen</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="createAssetWorkflowNote(decodeURIComponent('${assetArg}'),'inventory')">Inventur bestätigen</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="createAssetWorkflowNote(decodeURIComponent('${assetArg}'),'loan')">Ausgabe/Rückgabe planen</button>
+  </div>`;
+}
+function renderAssetTabContent(a, related){
+  const hw = related.hardware[0] || null;
+  const net = related.network[0] || null;
+  if(ASSET_DETAIL_TAB === 'hardware') return hw ? `<div class="kv">${Object.entries(hw).map(([k,v])=>kv(displayFieldLabel('hardware',k),v)).join('')}</div>` : '<div class="text-muted">Keine Hardware erfasst.</div>';
+  if(ASSET_DETAIL_TAB === 'software') return assetRowsTable(related.software, ['Software-ID','Softwarename','Version','Hersteller','Lizenzstatus','Update-Status']);
+  if(ASSET_DETAIL_TAB === 'network') return net ? `<div class="kv">${Object.entries(net).map(([k,v])=>kv(displayFieldLabel('netzwerk',k),v)).join('')}</div>` : '<div class="text-muted">Keine Netzwerkdaten erfasst.</div>';
+  if(ASSET_DETAIL_TAB === 'tickets') return assetRowsTable(related.tickets, ['Ticket-ID','Titel','Kategorie','Priorität','Status','Knowledge-ID']);
+  if(ASSET_DETAIL_TAB === 'notes') return assetRowsTable(related.notes, ['Notiz-ID','Titel','Kategorie','Status','Inhalt']);
+  if(ASSET_DETAIL_TAB === 'knowledge') return assetRowsTable(related.knowledge, ['Knowledge-ID','Titel','Kategorie','Tags','Lösung']);
+  if(ASSET_DETAIL_TAB === 'history') return renderAssetHistory(a, related);
+  return `<div class="row mt-3"><div class="col"><div class="kv">${kv('Asset-ID',a['Asset-ID'])}${kv('Standort',val(a,'Standort'))}${kv('Raum',val(a,'Raum'))}${kv('Hauptnutzer',val(a,'Hauptnutzer'))}</div></div><div class="col"><div class="kv">${kv('Hersteller',val(a,'Hersteller'))}${kv('Modell',val(a,'Modell'))}${kv('Betriebssystem',val(a,'Betriebssystem'))}${kv('Inventar',val(a,'Inventarnummer'))}</div></div></div>`;
+}
+function renderAssetCard(a,idx,total){
+  if(!a) return '<div class="card"><div class="card-body">Keine Daten</div></div>';
+  const id = a['Asset-ID'];
+  const related = {
+    hardware: byAsset('hardware', id),
+    network: byAsset('netzwerk', id),
+    software: byAsset('software', id),
+    tickets: byAsset('tickets', id),
+    notes: byAsset('notizen', id),
+    knowledge: (DB.knowledge || []).filter(k => byAsset('tickets', id).some(t => t['Knowledge-ID'] && t['Knowledge-ID'] === k['Knowledge-ID']))
+  };
+  if(!['overview','hardware','software','network','tickets','notes','knowledge','history'].includes(ASSET_DETAIL_TAB)) ASSET_DETAIL_TAB = 'overview';
+  return `${nav('assets',idx,total)}
+  <div class="card mt-3">
+    <div class="card-body">
+      <div class="detail-title">${val(a,'Gerätename')}</div>
+      <span class="badge text-bg-primary">${val(a,'Asset-Typ')}</span>
+      <span class="badge text-bg-success">${val(a,'Status')}</span>
+      ${renderAssetWorkflowActions(a)}
+      <ul class="nav nav-pills mt-3 asset-detail-tabs">
+        ${assetTabButton('overview','Übersicht')}
+        ${assetTabButton('hardware','Hardware',related.hardware.length)}
+        ${assetTabButton('software','Software',related.software.length)}
+        ${assetTabButton('network','Netzwerk',related.network.length)}
+        ${assetTabButton('tickets','Tickets',related.tickets.length)}
+        ${assetTabButton('notes','Notizen',related.notes.length)}
+        ${assetTabButton('knowledge','Knowledge',related.knowledge.length)}
+        ${assetTabButton('history','Historie')}
+      </ul>
+      <div class="asset-detail-panel mt-3">${renderAssetTabContent(a, related)}</div>
+    </div>
+  </div>`;}
 function renderModuleCard(mod,r,idx,total){if(!r)return '<div class="card"><div class="card-body">Keine Daten</div></div>';const a=assetFor(r);let main='';Object.entries(r).forEach(([k,v])=>main+=kv(displayFieldLabel(mod.key,k),v));return `${nav(mod.key,idx,total)}<div class="card mt-3 card-context-${mod.context||'default'}"><div class="card-body"><div class="detail-title">${r[mod.id]||mod.title}</div><span class="badge text-bg-primary">${mod.title}</span> <span class="badge text-bg-success">zugeordnet zu: ${assetName(r['Asset-ID'])}</span>${logicBadges(mod.key,r)}<div class="row mt-3"><div class="col"><h5>Eintrag</h5><div class="kv">${main}</div></div><div class="col"><h5>Zugeordnetes Asset</h5>${a?assetSummary(a):'<p>Kein Asset zugeordnet.</p>'}</div></div></div></div>`;}
 function logicBadges(key,r){let out='';if(key==='tickets'&&r.Status==='Gelöst')out+='<div class="alert alert-success mt-2">Ticket ist gelöst: Knowledge-Erstellung ist sinnvoll.</div>';if(key==='netzwerk'&&r.Adressart==='DHCP')out+='<div class="alert alert-info mt-2">DHCP aktiv: IP-Adresse wird nicht manuell gepflegt.</div>';if(key==='netzwerk'&&r.Verbindungstyp.includes('WLAN'))out+='<div class="alert alert-info mt-2">WLAN aktiv: Access Point und SSID relevant.</div>';return out;}
 function renderGenericCard(mod,r,idx,total){if(!r)return '<div class="card"><div class="card-body">Keine Daten</div></div>';let main='';Object.entries(r).forEach(([k,v])=>main+=kv(displayFieldLabel(mod.key,k),v));return `${nav(mod.key,idx,total)}<div class="card mt-3 card-context-${mod.context||'default'}"><div class="card-body"><div class="detail-title">${r[mod.id]||mod.title}</div><div class="kv mt-3">${main}</div></div></div>`;}
@@ -1762,6 +1878,9 @@ function networkValidationMessages(data){
     if(!dns) msgs.push('Statisch: DNS-Eintrag ist Pflicht.');
   }
   if(n['MAC-Adresse'] && !isValidMac(n['MAC-Adresse'])) msgs.push('MAC-Adresse hat kein gültiges Format.');
+  const vlan = String(n.VLAN || '').trim();
+  if(vlan && vlan !== '-' && !/^\d{1,4}$/.test(vlan)) warnings.push('VLAN sollte als Zahl gepflegt werden.');
+  if(/^\d+$/.test(vlan) && (Number(vlan) < 1 || Number(vlan) > 4094)) msgs.push('VLAN liegt ausserhalb des gültigen Bereichs 1-4094.');
   return {errors: msgs, warnings};
 }
 function resetNetworkFieldsForProfile(){
@@ -2031,6 +2150,7 @@ function findKnowledgeByTitle(title){
   return (DB.knowledge || []).find(k => String(k.Titel||'').toLowerCase() === String(title||'').toLowerCase());
 }
 function createKnowledgeForSoftware(title){
+  if(!requireWriteAccess('Knowledge erstellen')) return;
   if(!DB.knowledge) DB.knowledge = [];
   const existing = findKnowledgeByTitle(title);
   if(existing){ toast('Knowledge existiert bereits.'); renderWizard(); return; }
@@ -2074,7 +2194,7 @@ function smartSoftwareRemark(key, state){
   return 'Aus Smart-Software-Checkliste erstellt.';
 }
 
-function openDeviceWizard(){wizard={step:0,data:{type:'PC',grund:{Standort:STAMM.standorte?.[0]||'Bibliothek',Raum:STAMM.raeume?.[0]||'',Status:STAMM.status?.[0]||'Aktiv',Hauptnutzer:'',Hersteller:STAMM.hersteller?.[0]||'',Modellserie:'',Modell:'',Seriennummer:'',Inventarnummer:'',Betriebssystem:STAMM.betriebssysteme?.[0]||'Windows 11',Domäne:STAMM.domaenen?.[0]||'EAH',Ausmusterungsdatum:'',Defektbeschreibung:'',Notizen:''},hardware:{CPU:'',RAM:'',Speicher:'',Monitor:'',Dockingstation:'',Druckertyp:'',Toner:'',Zählerstand:'',PoE:'',Controller:'',GarantieBis:'',Bemerkung:''},netzwerk:{Netzwerktyp:STAMM.netzwerktypen?.[0]||'LAN',Adressart:'DHCP',Verbindungstyp:STAMM.verbindungstypen?.[0]||'LAN direkt Wanddose','IP-Adresse':'',DNS:'','MAC-Adresse':'',VLAN:STAMM.vlans?.[0]||'',SwitchPort:STAMM.switches?.[0]||'',Wanddose:'',AccessPoint:STAMM.accesspoints?.[0]||'',SSID:STAMM.ssids?.[0]||'',Bemerkung:''},software:[],smartSoftware:{},notiz:''}};renderWizard();new bootstrap.Modal(document.getElementById('deviceWizardModal')).show();}
+function openDeviceWizard(){if(!requireWriteAccess('Neues Gerät erfassen')) return;wizard={step:0,data:{type:'PC',grund:{Standort:STAMM.standorte?.[0]||'Bibliothek',Raum:STAMM.raeume?.[0]||'',Status:STAMM.status?.[0]||'Aktiv',Hauptnutzer:'',Hersteller:STAMM.hersteller?.[0]||'',Modellserie:'',Modell:'',Seriennummer:'',Inventarnummer:'',Betriebssystem:STAMM.betriebssysteme?.[0]||'Windows 11',Domäne:STAMM.domaenen?.[0]||'EAH',Ausmusterungsdatum:'',Defektbeschreibung:'',Notizen:''},hardware:{CPU:'',RAM:'',Speicher:'',Monitor:'',Dockingstation:'',Druckertyp:'',Toner:'',Zählerstand:'',PoE:'',Controller:'',GarantieBis:'',Bemerkung:''},netzwerk:{Netzwerktyp:STAMM.netzwerktypen?.[0]||'LAN',Adressart:'DHCP',Verbindungstyp:STAMM.verbindungstypen?.[0]||'LAN direkt Wanddose','IP-Adresse':'',DNS:'','MAC-Adresse':'',VLAN:STAMM.vlans?.[0]||'',SwitchPort:STAMM.switches?.[0]||'',Wanddose:'',AccessPoint:STAMM.accesspoints?.[0]||'',SSID:STAMM.ssids?.[0]||'',Bemerkung:''},software:[],smartSoftware:{},notiz:''}};renderWizard();new bootstrap.Modal(document.getElementById('deviceWizardModal')).show();}
 function wizardSteps(){return ['Gerätetyp','Grunddaten','Hardware','Netzwerk','Software','Vorschau'];}
 
 // ===== v26.3 SAFE FORM HELPER FIX =====
@@ -2269,26 +2389,6 @@ function wizardBack(){
   }
 }
 
-// ===== v26.5 CORE FORM PATH HELPERS =====
-function getPath(obj, path){
-  if(!obj || !path) return undefined;
-  return String(path).split('.').reduce((acc,key)=>acc ? acc[key] : undefined, obj);
-}
-function setPath(obj, path, value){
-  if(!obj || !path) return;
-  const parts = String(path).split('.');
-  let cur = obj;
-  for(let i=0;i<parts.length-1;i++){
-    const key = parts[i];
-    if(typeof cur[key] !== 'object' || cur[key] === null){
-      cur[key] = {};
-    }
-    cur = cur[key];
-  }
-  cur[parts[parts.length-1]] = value;
-}
-
-
 function saveWizardFields(){
   if(!wizard || !wizard.data) return;
   document.querySelectorAll('.wiz').forEach(el=>{
@@ -2389,6 +2489,7 @@ function wizardPreview(){
 
 function wizardSave(){
   try{
+    if(!requireWriteAccess('Gerät erstellen')) return;
     saveWizardFields();
     const validation=networkValidationMessages(wizard.data);
     if(validation.errors.length){
@@ -2436,6 +2537,7 @@ function hasExistingAssetLink(key, assetId){
   return (DB[key]||[]).some(x => x['Asset-ID'] === assetId);
 }
 function openReferenceCreate(key){
+  if(!requireWriteAccess('Eintrag anlegen')) return;
   const mod = modules.find(m => m.key === key);
   if(!mod) return;
   const assets = DB.assets || [];
@@ -2455,10 +2557,118 @@ function openReferenceCreate(key){
   buildForm(mod, template, 'Neu anlegen – Asset referenzieren');
 }
 
+function openTicketFromAsset(assetId){
+  if(!requireWriteAccess('Ticket aus Asset erstellen')) return;
+  const asset = CORE.findAsset(assetId);
+  if(!asset){
+    notify('Asset nicht gefunden.', 'error');
+    return;
+  }
+  const mod = modules.find(m => m.key === 'tickets');
+  modalState = {key:'tickets', index:null, mode:'create'};
+  const template = {
+    'Ticket-ID': nextId('tickets','Ticket-ID',ID_PREFIXES.tickets),
+    'Asset-ID': asset['Asset-ID'],
+    'Gerätename': asset['Gerätename'],
+    'Titel': '',
+    'Kategorie': (STAMM.ticketKategorien || ['Allgemein'])[0] || 'Allgemein',
+    'Priorität': (STAMM.prioritaeten || ['Normal']).includes('Normal') ? 'Normal' : ((STAMM.prioritaeten || ['Normal'])[0] || 'Normal'),
+    'Status': 'Offen',
+    'Tags': 'asset;nacharbeit',
+    'Ursache': '',
+    'Lösung': '',
+    'Knowledge-ID': ''
+  };
+  buildForm(mod, template, 'Ticket aus Asset erstellen');
+}
+
+function createAssetNote(asset, title, content){
+  if(!asset) return false;
+  if(!safetyConfirm(title + '?', asset['Gerätename'] || asset['Asset-ID'])) return false;
+  if(!Array.isArray(DB.notizen)) DB.notizen = [];
+  DB.notizen.push({
+    'Notiz-ID': nextId('notizen','Notiz-ID',ID_PREFIXES.notizen),
+    'Asset-ID': asset['Asset-ID'],
+    'Gerätename': asset['Gerätename'],
+    'Titel': title,
+    'Kategorie': 'Workflow',
+    'Status': 'Aktiv',
+    'Inhalt': content
+  });
+  persist();
+  maybeSaveDbToServer();
+  ASSET_DETAIL_TAB = 'notes';
+  renderAll();
+  toast('Workflow-Notiz erstellt.');
+  return true;
+}
+
+function createAssetWorkflowNote(assetId, type){
+  if(!requireWriteAccess('Workflow-Notiz erstellen')) return;
+  const asset = CORE.findAsset(assetId);
+  if(!asset){
+    notify('Asset nicht gefunden.', 'error');
+    return;
+  }
+  const today = new Date().toISOString().slice(0,10);
+  const workflows = {
+    move: {
+      title: 'Workflow: Asset umziehen',
+      content: `Umzug vorbereiten (${today})\n\nNeuer Standort/Raum:\nNetzwerkbezug prüfen: VLAN, Switch-Port, Wanddose, Access Point, SSID\nBetroffene Tickets/Notizen prüfen:\nAbschlussnotiz ergänzen:`
+    },
+    retire: {
+      title: 'Workflow: Asset ausmustern',
+      content: `Ausmusterung vorbereiten (${today})\n\nStatus auf Ausgemustert setzen\nOffene Tickets prüfen\nSoftware-/Lizenzhinweise prüfen\nDatenträger-/Datenschutzschritt dokumentieren\nRückgabe, Lager oder Entsorgung festlegen:`
+    },
+    inventory: {
+      title: 'Inventur bestätigt',
+      content: `Inventur bestätigt am ${today}\n\nStandort/Raum geprüft:\nSeriennummer/Inventarnummer geprüft:\nAbweichungen:\nGesehen von:`
+    },
+    loan: {
+      title: 'Workflow: Ausgabe/Rückgabe',
+      content: `Ausgabe/Rückgabe vorbereiten (${today})\n\nPerson/Team:\nZubehör:\nZustand bei Ausgabe/Rückgabe:\nFrist/Rückgabedatum:\nUnterschrift/Bestätigung:`
+    }
+  };
+  const workflow = workflows[type] || workflows.inventory;
+  createAssetNote(asset, workflow.title, workflow.content);
+}
+
+function createScannerReviewNote(idx){
+  if(!requireWriteAccess('Scannerbefund notieren')) return;
+  const row = softwareFullRows()[idx] || softwareFullRows()[SOFTWARE_FULL_SELECTED];
+  if(!row){
+    notify('Kein Scannerbefund ausgewählt.', 'warning');
+    return;
+  }
+  const asset = softwareFullAsset(row);
+  if(!asset){
+    notify('Der Scannerbefund ist keinem Asset zugeordnet. Bitte zuerst Asset-Kontext prüfen.', 'warning');
+    return;
+  }
+  const name = row.DisplayName || softwareFullDisplayName(row);
+  const content = [
+    'Scannerbefund prüfen',
+    '',
+    `Software: ${name || '-'}`,
+    `Version: ${softwareFullVersion(row) || '-'}`,
+    `Hersteller: ${row.Publisher || row.Hersteller || '-'}`,
+    `Quelle: ${row.Sources || row.Source || row.Quelle || '-'}`,
+    `Confidence: ${row.DetectionConfidence || '-'}`,
+    `Update-Auswertung: ${softwareFullUpdateAssessment(row)}`,
+    '',
+    'Nacharbeit:',
+    '- Anwendung fachlich einordnen',
+    '- Update-/Lizenzstatus prüfen',
+    '- Standardsoftware oder Ausnahme dokumentieren'
+  ].join('\n');
+  createAssetNote(asset, 'Scannerbefund prüfen: ' + (name || 'Software'), content);
+}
+
 // CRUD modal
 
 function deleteAssetWithReferences(idx){
-  const rows = filterRows(DB.assets || []);
+  if(!requireWriteAccess('Asset löschen')) return;
+  const rows = filterRows(DB.assets || [], 'assets');
   const asset = rows[idx];
   if(!asset) return;
 
@@ -2498,9 +2708,14 @@ function deleteAssetWithReferences(idx){
   toast('Asset inklusive Referenzen gelöscht.');
 }
 
-function openCreate(key){const mod=modules.find(m=>m.key===key);modalState={key,index:null,mode:'create'};const template=(DB[key]&&DB[key][0])?Object.fromEntries(Object.keys(DB[key][0]).map(k=>[k,''])):{};template[mod.id]=nextId(key,mod.id,mod.prefix);if(template['Asset-ID']!==undefined){template['Asset-ID']=DB.assets[0]?.['Asset-ID']||'';template['Gerätename']=DB.assets[0]?.['Gerätename']||'';}buildForm(mod,template,'Neu anlegen');}
-function openEdit(key,idx){const rows=filterRows(DB[key]||[]), row=rows[idx], realIdx=DB[key].indexOf(row);modalState={key,index:realIdx,mode:'edit'};buildForm(modules.find(m=>m.key===key),{...row},'Bearbeiten');}
-function buildForm(mod,row,title){document.getElementById('editTitle').textContent=`${mod.title} – ${title}`;document.getElementById('editForm').innerHTML=Object.keys(row).map(k=>fieldHtml(k,row[k],mod)).join('');new bootstrap.Modal(document.getElementById('editModal')).show();setTimeout(applyEditLogic,50);}
+function openCreate(key){if(!requireWriteAccess('Eintrag anlegen')) return;const mod=modules.find(m=>m.key===key);modalState={key,index:null,mode:'create'};const template=(DB[key]&&DB[key][0])?Object.fromEntries(Object.keys(DB[key][0]).map(k=>[k,''])):{};template[mod.id]=nextId(key,mod.id,mod.prefix);if(template['Asset-ID']!==undefined){template['Asset-ID']=DB.assets[0]?.['Asset-ID']||'';template['Gerätename']=DB.assets[0]?.['Gerätename']||'';}buildForm(mod,template,'Neu anlegen');}
+function openEdit(key,idx){if(!requireWriteAccess('Eintrag bearbeiten')) return;const rows=filterRows(DB[key]||[],key), row=rows[idx], realIdx=DB[key].indexOf(row);modalState={key,index:realIdx,mode:'edit'};buildForm(modules.find(m=>m.key===key),{...row},'Bearbeiten');}
+function buildForm(mod,row,title){document.getElementById('editTitle').textContent=`${mod.title} – ${title}`;document.getElementById('editForm').innerHTML=renderModalRequiredSummary(mod.key)+Object.keys(row).map(k=>fieldHtml(k,row[k],mod)).join('');new bootstrap.Modal(document.getElementById('editModal')).show();setTimeout(applyEditLogic,50);}
+function renderModalRequiredSummary(key){
+  const fields = (typeof REQUIRED_FIELDS !== 'undefined' && REQUIRED_FIELDS[key]) ? REQUIRED_FIELDS[key] : [];
+  if(!fields.length) return '';
+  return `<div class="alert alert-light modal-required-summary"><b>Pflichtfelder:</b> ${fields.map(safeEscape).join(', ')}</div>`;
+}
 function fieldHtml(k,v,mod){const readonly=(k===mod.id);if(k==='Asset-ID' && modalState.key==='assets')return `<div><label class="form-label required-label">${displayFieldLabel(modalState.key,k)}</label><input class="form-control edit-field" data-key="${k}" value="${v||''}" readonly><div class="logic-hint">Asset-ID bleibt fest.</div></div>`;
 if(k==='Asset-ID')return `<div><label class="form-label required-label">${displayFieldLabel(modalState.key,k)}</label><select class="form-select edit-field" data-key="${k}" onchange="syncAssetName(this.value);applyEditLogic();showReferenceWarning()">${DB.assets.map(a=>`<option value="${a['Asset-ID']}" ${a['Asset-ID']===v?'selected':''}>${a['Asset-ID']} – ${a['Gerätename']}</option>`).join('')}</select><div class="logic-hint">Pflicht: Eintrag wird mit diesem Asset verknüpft.</div></div>`;
 if(modalState.key==='software' && k==='Hersteller'){
@@ -2632,18 +2847,8 @@ function syncAssetName(assetId){const a=DB.assets.find(x=>x['Asset-ID']===assetI
 
 // ===== v9 NETWORK VALIDATION & AUTOFILL =====
 function validateNetworkStrict(obj){
-  if(obj['Adressart']==='Statisch'){
-    if(!obj['IP-Adresse']) return 'IP-Adresse ist Pflicht bei statischer Konfiguration';
-    if(!obj['DNS']) return 'DNS ist Pflicht bei statischer Konfiguration';
-  }
-  if(obj['Verbindungstyp']?.includes('WLAN')){
-    if(!obj['Access Point']) return 'Access Point muss gewählt werden bei WLAN';
-    if(!obj['SSID']) return 'SSID muss gewählt werden bei WLAN';
-  }
-  if(obj['Verbindungstyp']?.includes('LAN')){
-    if(!obj['Switch-Port']) return 'Switch-Port muss gesetzt werden bei LAN';
-  }
-  if(!networkTypeMatchesConnection(obj['Netzwerktyp'], obj['Verbindungstyp'])) return 'Netzwerktyp und Verbindungstyp passen nicht zusammen.';
+  const check = networkValidationMessages(obj || {});
+  if(check.errors.length) return check.errors[0];
   return null;
 }
 
@@ -2660,11 +2865,13 @@ function autoFillNetwork(obj){
 
 function saveModal(){
   try{
+    if(!requireWriteAccess('Speichern')) return;
     applyEditLogic();
     let obj={};
     document.querySelectorAll('.edit-field').forEach(el=>{
       obj[el.dataset.key]=el.value;
     });
+    if(obj.Tags) obj.Tags = normalizeTags(obj.Tags);
     if(isAssetLinkedModule(modalState.key)&&!obj['Asset-ID']){
       alert('Bitte ein Asset auswählen.');
       return;
@@ -2710,8 +2917,102 @@ function saveModal(){
     alert('Speichern fehlgeschlagen:\n' + e.message);
   }
 }
-function deleteRow(key,idx){const rows=filterRows(DB[key]||[]), row=rows[idx], realIdx=DB[key].indexOf(row);if(realIdx<0)return;if(!APP_SETTINGS.confirmDelete || confirm('Eintrag wirklich löschen?')){DB[key].splice(realIdx,1);selectedIndex[key]=0;persist();maybeSaveDbToServer();render();toast('Gelöscht.');}}
-function createKnowledgeFromTicket(idx){const rows=filterRows(DB.tickets), t=rows[idx];if(!t||t.Status!=='Gelöst'){alert('Knowledge kann erst aus gelöstem Ticket erstellt werden.');return;}const kbId=nextId('knowledge','Knowledge-ID',ID_PREFIXES.knowledge);DB.knowledge.push({'Knowledge-ID':kbId,'Titel':t.Titel,'Kategorie':t.Kategorie,'Tags':t.Tags,'Lösung':t.Lösung});t['Knowledge-ID']=kbId;persist();activeKey='knowledge';selectedIndex.knowledge=DB.knowledge.length-1;renderAll();toast('Knowledge aus Ticket erstellt.');}
+
+function normalizeTags(value){
+  return Array.from(new Set(String(value || '')
+    .split(/[;,]/)
+    .map(x => x.trim().toLowerCase())
+    .filter(Boolean)))
+    .join(';');
+}
+function deleteRow(key,idx){if(!requireWriteAccess('Eintrag löschen')) return;const rows=filterRows(DB[key]||[],key), row=rows[idx], realIdx=DB[key].indexOf(row);if(realIdx<0)return;if(!APP_SETTINGS.confirmDelete || confirm('Eintrag wirklich löschen?')){DB[key].splice(realIdx,1);selectedIndex[key]=0;persist();maybeSaveDbToServer();render();toast('Gelöscht.');}}
+function createKnowledgeFromTicket(idx){
+  if(!requireWriteAccess('Knowledge erstellen')) return;
+  const rows = filterRows(DB.tickets, 'tickets');
+  const t = rows[idx];
+  if(!t || t.Status !== 'Gelöst'){
+    alert('Knowledge kann erst aus gelöstem Ticket erstellt werden.');
+    return;
+  }
+  const preview = [
+    'Knowledge aus gelöstem Ticket erstellen?',
+    '',
+    `Titel: ${t.Titel || '-'}`,
+    `Kategorie: ${t.Kategorie || '-'}`,
+    `Tags: ${t.Tags || '-'}`,
+    `Ursache: ${t.Ursache || '-'}`,
+    `Lösung: ${t.Lösung || '-'}`
+  ].join('\n');
+  if(!confirm(preview)) return;
+  const kbId = nextId('knowledge','Knowledge-ID',ID_PREFIXES.knowledge);
+  const solution = [
+    t.Ursache ? `Ursache: ${t.Ursache}` : '',
+    t.Lösung ? `Lösung: ${t.Lösung}` : '',
+    `Quelle: Ticket ${t['Ticket-ID'] || ''} (${t['Gerätename'] || t['Asset-ID'] || '-'})`
+  ].filter(Boolean).join('\n\n');
+  DB.knowledge.push({
+    'Knowledge-ID': kbId,
+    'Titel': t.Titel,
+    'Kategorie': t.Kategorie,
+    'Tags': t.Tags,
+    'Lösung': solution
+  });
+  t['Knowledge-ID'] = kbId;
+  persist();
+  maybeSaveDbToServer();
+  activeKey = 'knowledge';
+  selectedIndex.knowledge = DB.knowledge.length - 1;
+  renderAll();
+  toast('Knowledge aus Ticket erstellt.');
+}
+
+function duplicateKeys(rows, keyFn){
+  const seen = new Map();
+  rows.forEach(row => {
+    const key = keyFn(row);
+    if(!key) return;
+    if(!seen.has(key)) seen.set(key, []);
+    seen.get(key).push(row);
+  });
+  return Array.from(seen.entries()).filter(([,items]) => items.length > 1);
+}
+
+function dataQualityFindings(){
+  const findings = [];
+  duplicateKeys(DB.assets || [], a => String(a['Gerätename'] || '').toLowerCase()).forEach(([key,items]) => findings.push(`Doppelter Gerätename: ${key} (${items.length})`));
+  duplicateKeys(DB.assets || [], a => String(a.Seriennummer || '').toLowerCase()).forEach(([key,items]) => findings.push(`Doppelte Seriennummer: ${key} (${items.length})`));
+  duplicateKeys(DB.assets || [], a => String(a.Inventarnummer || '').toLowerCase()).forEach(([key,items]) => findings.push(`Doppelte Inventarnummer: ${key} (${items.length})`));
+  duplicateKeys(DB.netzwerk || [], n => String(n['MAC-Adresse'] || '').toLowerCase()).forEach(([key,items]) => findings.push(`Doppelte MAC-Adresse: ${key} (${items.length})`));
+  duplicateKeys(DB.software || [], s => [s['Asset-ID'], String(s.Softwarename || '').toLowerCase(), String(s.Version || '').toLowerCase(), normalizeManufacturer(s.Hersteller).toLowerCase()].join('|')).forEach(([key,items]) => findings.push(`Doppelter Softwareeintrag: ${key} (${items.length})`));
+  findings.push(...stammdatenFindings());
+  return findings;
+}
+
+function stammdatenFindings(){
+  const checks = [
+    {table:'assets', field:'Asset-Typ', stamm:'assetTypen'},
+    {table:'assets', field:'Status', stamm:'status'},
+    {table:'assets', field:'Standort', stamm:'standorte'},
+    {table:'assets', field:'Raum', stamm:'raeume'},
+    {table:'assets', field:'Hersteller', stamm:'hersteller', normalize:normalizeManufacturer},
+    {table:'netzwerk', field:'Netzwerktyp', stamm:'netzwerktypen'},
+    {table:'netzwerk', field:'Adressart', stamm:'adressarten'},
+    {table:'tickets', field:'Status', stamm:'ticketStatus'},
+    {table:'tickets', field:'Priorität', stamm:'prioritaeten'}
+  ];
+  const findings = [];
+  checks.forEach(check => {
+    const allowed = new Set((STAMM[check.stamm] || []).map(x => String(x).toLowerCase()));
+    if(!allowed.size) return;
+    (DB[check.table] || []).forEach(row => {
+      const raw = row[check.field];
+      if(!raw) return;
+      const value = check.normalize ? check.normalize(raw) : raw;
+      if(!allowed.has(String(value).toLowerCase())) findings.push(`${check.table}.${check.field}: "${raw}" nicht in Stammdaten`);
+    });
+  });
+  return findings;
+}
 
 function showStartupError(error){
   console.error('APP START ERROR:', error);
@@ -2735,4 +3036,3 @@ function startApp(){
 startApp();
 
 function OpenDeviceWizard(){ return openDeviceWizard(); }
-

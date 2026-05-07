@@ -28,7 +28,19 @@ Backup, Import, Export und manuelles CSV-Speichern bleiben im Admin Panel im Ber
 
 Dashboard, Asset-, Hardware-, Software-, Netzwerk-, Ticket-, Notiz- und Knowledge-Ansichten sollen keine separaten Backup-, Import-, Export- oder CSV-Speicherbuttons erhalten.
 
+## Rollenmodus
+
+Die Web-App besitzt einen lokalen Rollenmodus `Admin` / `Normal`.
+
+Der Modus ist ein Bedien- und Schreibschutz in der Oberfläche, aber keine echte Authentifizierung. Im Normalmodus werden Admin- und Stammdatenbereiche ausgeblendet und Schreibaktionen durch `requireWriteAccess()` blockiert.
+
+`start.bat` erzwingt Administratorrechte über eine UAC-Abfrage, damit aus der Web-App gestartete lokale Scanner vollständiger arbeiten können. Das erhöht die Windows-Rechte des lokalen Prozesses, ersetzt aber keine Anmeldung, Rechteverwaltung oder Server-Authentifizierung.
+
+Details: [ROLLEN_RECHTE.md](ROLLEN_RECHTE.md).
+
 ## Serverseitiger Schutz
+
+Der Server bindet lokal und laesst als Host nur `127.0.0.1` oder `localhost` zu. Schreibende API-Endpunkte unter `/api/` lehnen fremde `Host`-, `Origin`- oder `Referer`-Kontexte ab.
 
 `app_server.py` akzeptiert beim Speichern nur vollständige Datenpakete. Diese Tabellen müssen vorhanden und Listen sein:
 
@@ -49,20 +61,30 @@ Vor jedem erfolgreichen CSV-Schreiben wird ein Backup unter `web_ui/backups/back
 Für reine Syntaxprüfung:
 
 ```powershell
-Check-HardwareScanner-Syntax.bat
+scripts\Check-HardwareScanner-Syntax.bat
 ```
 
-Für echten Scan:
+Für echten Hardware-Scan:
 
 ```powershell
-Start-HardwareScan.bat
+scripts\Start-HardwareScan.bat
 ```
 
-Für echten Scan mit vollständiger Softwareliste:
+Für separaten Software-Scan der Standardsoftware:
 
 ```powershell
-Start-HardwareScan-FullSoftware.bat
+scripts\Start-SoftwareScan.bat
 ```
+
+Für separaten Software-Scan mit vollständiger Softwareliste:
+
+```powershell
+scripts\Start-SoftwareScan-Full.bat
+```
+
+`scripts\Start-HardwareScan-FullSoftware.bat` bleibt nur als alter Kompatibilitätsalias bestehen.
+
+Der Full-Software-Scan erzeugt `web_ui/data/software_full.csv` mit möglichst vielen lokal erkennbaren Programmen und Paketen. Diese Datei bleibt ein lokales Artefakt und wird nicht automatisch als produktive Web-App-Tabelle importiert.
 
 Wichtig: Den Scanner nicht mit `-?` starten. Das Script besitzt keinen Hilfe-Modus und würde dadurch trotzdem einen Scan ausführen.
 
@@ -70,6 +92,10 @@ Wenn CIM/WMI-Abfragen fehlschlagen, zum Beispiel durch verweigerten Zugriff, sch
 
 ## Änderungsregeln für Code
 
+- `AGENTS.md` und `CODEX_ARBEITSKONZEPT.md` gelten als Arbeitsleitlinie für Codex.
+- Das Repository ist wichtiger als Konzeptdokumente: erst Code lesen, dann ändern.
+- Keine parallelen Systeme aufbauen, wenn ein vorhandenes Modul erweitert werden kann.
+- Keine Datenmodell-, Import-/Export- oder Scanner-Änderung ohne Erhalt der bestehenden Funktionen.
 - Vor Änderungen erst die betroffene Funktion lesen.
 - Keine blinden globalen Ersetzungen in `web_ui/js/app.js`.
 - Funktionen blockweise ändern.
@@ -88,19 +114,20 @@ python -m py_compile app_server.py
 PowerShell-Scanner:
 
 ```powershell
-Check-HardwareScanner-Syntax.bat
+scripts\Check-HardwareScanner-Syntax.bat
 ```
 
 JavaScript, sobald Node.js verfügbar ist:
 
 ```powershell
-node --check web_ui/js/app.js
+scripts\Check-WebApp-Syntax.bat
 ```
 
 Gesammelter Check:
 
 ```powershell
-Check-WebApp-Syntax.bat
+scripts\Check-WebApp-Syntax.bat
+scripts\Smoke-Test.bat
 ```
 
 Manuelle Smoke-Tests:

@@ -6,3 +6,4 @@
 - Sekretariat
 - Magazin
 - Schulungsraum
+- FB-WI

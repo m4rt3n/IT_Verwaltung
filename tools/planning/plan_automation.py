@@ -38,7 +38,7 @@ def read_text(path: Path) -> str:
 
 def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    path.write_text(text.replace("\r\n", "\n").replace("\r", "\n"), encoding="utf-8")
 
 
 def parse_tasks(source: str, path: Path) -> list[Task]:
@@ -241,14 +241,17 @@ def codex_prompt() -> str:
 
     return f"""# Codex Next Prompt
 
+Lies zuerst `AGENTS.md` und `dokumentation/CODEX_ARBEITSKONZEPT.md`.
+
 {task_text}
 
 Arbeitsregeln:
 
 - Vor Codeaenderungen relevante Dateien lesen.
+- Keine parallelen Systeme bauen, wenn bestehende Module erweitert werden koennen.
 - Keine bestehenden Nutzerdaten oder Backups loeschen.
 - Bei Schreib-/Datenaktionen Sicherheitsabfragen erhalten.
-- Nach Aenderungen `Check-WebApp-Syntax.bat` ausfuehren.
+- Nach Aenderungen `scripts\\Check-WebApp-Syntax.bat` ausfuehren.
 - Danach `python tools/planning/plan_automation.py status` ausfuehren.
 - Erledigte Aufgaben in `planung/*.md` markieren.
 - Kurze Zusammenfassung mit geaenderten Dateien und Tests liefern.

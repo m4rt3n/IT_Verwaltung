@@ -1,0 +1,472 @@
+{
+  "version": 1,
+  "description": "Kuratiertes Regelwerk fuer Full-Software-Auswertung. Rohdaten bleiben unveraendert.",
+  "classLabels": {
+    "productivity": "Produktivsoftware",
+    "admin": "Admin-/IT-Tools",
+    "development": "Entwicklung",
+    "security": "Sicherheit",
+    "driver": "Treiber & Geraete",
+    "runtime": "Runtimes & Frameworks",
+    "windows": "Windows-Bordmittel",
+    "service": "Dienste",
+    "unclear": "Unklare Funde"
+  },
+  "standardProfiles": {
+    "Desktop": [
+      "Microsoft Office",
+      "Mozilla Firefox",
+      "Google Chrome",
+      "Adobe Acrobat",
+      "7-Zip"
+    ],
+    "Notebook": [
+      "Microsoft Office",
+      "Mozilla Firefox",
+      "Google Chrome",
+      "Adobe Acrobat",
+      "7-Zip",
+      "OneDrive"
+    ],
+    "Admin": [
+      "Microsoft Office",
+      "Mozilla Firefox",
+      "Google Chrome",
+      "Adobe Acrobat",
+      "7-Zip",
+      "PowerShell",
+      "Sysinternals",
+      "Visual Studio Code"
+    ]
+  },
+  "productHints": {
+    "7-Zip": {
+      "class": "productivity",
+      "risk": "low",
+      "logo": "7z",
+      "labels": [
+        "Eigeninstallation",
+        "Archivtool"
+      ],
+      "logoPath": "img/logos/7zip.svg"
+    },
+    "Adobe Acrobat": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "PDF",
+      "labels": [
+        "Eigeninstallation",
+        "Lizenz/Update pruefen"
+      ],
+      "logoPath": "img/logos/adobe-acrobat.svg"
+    },
+    "Adobe Creative Cloud": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "Adobe",
+      "labels": [
+        "Eigeninstallation",
+        "Lizenzpflichtig"
+      ],
+      "logoPath": "img/logos/adobe-creative-cloud.svg"
+    },
+    "AOMEI Backupper": {
+      "class": "admin",
+      "risk": "medium",
+      "logo": "AOMEI",
+      "labels": [
+        "Admin-/Backup-Tool"
+      ]
+    },
+    "AnyToISO": {
+      "class": "admin",
+      "risk": "low",
+      "logo": "ISO",
+      "labels": [
+        "Eigeninstallation"
+      ]
+    },
+    "Brother Drucker/Scanner Suite": {
+      "class": "driver",
+      "risk": "medium",
+      "logo": "Brother",
+      "labels": [
+        "Treiber",
+        "Geraetesoftware"
+      ]
+    },
+    "Canon Druckertreiber": {
+      "class": "driver",
+      "risk": "medium",
+      "logo": "Canon",
+      "labels": [
+        "Treiber"
+      ]
+    },
+    "ChatGPT": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "GPT",
+      "labels": [
+        "Eigeninstallation"
+      ],
+      "logoPath": "img/logos/openai.svg"
+    },
+    "Chocolatey": {
+      "class": "admin",
+      "risk": "high",
+      "logo": "Choco",
+      "labels": [
+        "Paketmanager",
+        "Admin-Tool"
+      ],
+      "logoPath": "img/logos/chocolatey.svg"
+    },
+    "Fujitsu DeskUpdate": {
+      "class": "admin",
+      "risk": "medium",
+      "logo": "Fujitsu",
+      "labels": [
+        "Treiber-/Update-Tool"
+      ],
+      "logoPath": "img/logos/fujitsu.svg"
+    },
+    "Git": {
+      "class": "development",
+      "risk": "medium",
+      "logo": "Git",
+      "labels": [
+        "Entwicklung"
+      ],
+      "logoPath": "img/logos/git.svg"
+    },
+    "GLPI Agent": {
+      "class": "admin",
+      "risk": "medium",
+      "logo": "GLPI",
+      "labels": [
+        "Inventarisierung",
+        "Agent"
+      ]
+    },
+    "Google Chrome": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "Chrome",
+      "labels": [
+        "Browser"
+      ],
+      "logoPath": "img/logos/google-chrome.svg"
+    },
+    "Google Earth Pro": {
+      "class": "productivity",
+      "risk": "low",
+      "logo": "Earth",
+      "labels": [
+        "Eigeninstallation"
+      ],
+      "logoPath": "img/logos/google-earth.svg"
+    },
+    "IntelliJ IDEA Community": {
+      "class": "development",
+      "risk": "medium",
+      "logo": "IJ",
+      "labels": [
+        "Entwicklung"
+      ],
+      "logoPath": "img/logos/intellij-idea.svg"
+    },
+    "LibreOffice": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "LO",
+      "labels": [
+        "Office"
+      ],
+      "logoPath": "img/logos/libreoffice.svg"
+    },
+    "Macrium Reflect": {
+      "class": "admin",
+      "risk": "medium",
+      "logo": "Macrium",
+      "labels": [
+        "Backup-Tool"
+      ]
+    },
+    "Microsoft Edge": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "Edge",
+      "labels": [
+        "Browser",
+        "Windows-nah"
+      ],
+      "logoPath": "img/logos/microsoft-edge.svg"
+    },
+    "Microsoft Office": {
+      "class": "productivity",
+      "risk": "high",
+      "logo": "Office",
+      "labels": [
+        "Office",
+        "Lizenzpflichtig"
+      ],
+      "logoPath": "img/logos/microsoft-office.svg"
+    },
+    "Microsoft Teams": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "Teams",
+      "labels": [
+        "Kommunikation"
+      ],
+      "logoPath": "img/logos/microsoft-teams.svg"
+    },
+    "Microsoft Visual C++ Redistributable": {
+      "class": "runtime",
+      "risk": "low",
+      "logo": "VC++",
+      "labels": [
+        "Runtime",
+        "Komponente"
+      ],
+      "logoPath": "img/logos/microsoft.svg"
+    },
+    "Microsoft Visual Studio": {
+      "class": "development",
+      "risk": "medium",
+      "logo": "VS",
+      "labels": [
+        "Entwicklung"
+      ],
+      "logoPath": "img/logos/visual-studio.svg"
+    },
+    "Mozilla Firefox": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "Firefox",
+      "labels": [
+        "Browser"
+      ],
+      "logoPath": "img/logos/firefox.svg"
+    },
+    "Notepad++": {
+      "class": "productivity",
+      "risk": "low",
+      "logo": "N++",
+      "labels": [
+        "Editor"
+      ],
+      "logoPath": "img/logos/notepadplusplus.svg"
+    },
+    "OneDrive": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "OneDrive",
+      "labels": [
+        "Cloud-Sync"
+      ],
+      "logoPath": "img/logos/onedrive.svg"
+    },
+    "Paragon Partition Manager": {
+      "class": "admin",
+      "risk": "high",
+      "logo": "Paragon",
+      "labels": [
+        "Datentraeger-Tool"
+      ]
+    },
+    "PowerShell": {
+      "class": "admin",
+      "risk": "high",
+      "logo": "PS",
+      "labels": [
+        "Admin-Tool",
+        "Skripting"
+      ],
+      "logoPath": "img/logos/powershell.svg"
+    },
+    "PowerToys": {
+      "class": "admin",
+      "risk": "medium",
+      "logo": "PT",
+      "labels": [
+        "Admin-/Poweruser-Tool"
+      ]
+    },
+    "PuTTY": {
+      "class": "admin",
+      "risk": "medium",
+      "logo": "PuTTY",
+      "labels": [
+        "Remotezugriff"
+      ]
+    },
+    "Python": {
+      "class": "development",
+      "risk": "medium",
+      "logo": "Py",
+      "labels": [
+        "Entwicklung",
+        "Paketumgebung"
+      ],
+      "logoPath": "img/logos/python.svg"
+    },
+    "ShareX": {
+      "class": "productivity",
+      "risk": "low",
+      "logo": "ShareX",
+      "labels": [
+        "Screenshot"
+      ],
+      "logoPath": "img/logos/sharex.svg"
+    },
+    "Sophos Endpoint Security": {
+      "class": "security",
+      "risk": "high",
+      "logo": "Sophos",
+      "labels": [
+        "Security",
+        "Endpoint"
+      ]
+    },
+    "Sysinternals": {
+      "class": "admin",
+      "risk": "high",
+      "logo": "Sys",
+      "labels": [
+        "Admin-Tool",
+        "Diagnose"
+      ]
+    },
+    "Unity": {
+      "class": "development",
+      "risk": "medium",
+      "logo": "Unity",
+      "labels": [
+        "Entwicklung"
+      ],
+      "logoPath": "img/logos/unity.svg"
+    },
+    "Visual Studio Code": {
+      "class": "development",
+      "risk": "medium",
+      "logo": "Code",
+      "labels": [
+        "Entwicklung",
+        "Editor"
+      ],
+      "logoPath": "img/logos/visual-studio-code.svg"
+    },
+    "VLC media player": {
+      "class": "productivity",
+      "risk": "low",
+      "logo": "VLC",
+      "labels": [
+        "Medien"
+      ],
+      "logoPath": "img/logos/vlc.svg"
+    },
+    "WhatsApp": {
+      "class": "productivity",
+      "risk": "medium",
+      "logo": "WA",
+      "labels": [
+        "Kommunikation"
+      ],
+      "logoPath": "img/logos/whatsapp.svg"
+    },
+    "WinSCP": {
+      "class": "admin",
+      "risk": "medium",
+      "logo": "SCP",
+      "labels": [
+        "Remotezugriff",
+        "Dateitransfer"
+      ]
+    },
+    "Windows ADK": {
+      "class": "runtime",
+      "risk": "low",
+      "logo": "ADK",
+      "labels": [
+        "Windows-Komponente"
+      ],
+      "logoPath": "img/logos/windows.svg"
+    },
+    "Windows App Runtime": {
+      "class": "runtime",
+      "risk": "low",
+      "logo": "WinRT",
+      "labels": [
+        "Runtime"
+      ],
+      "logoPath": "img/logos/windows.svg"
+    },
+    "Windows Medienerweiterungen": {
+      "class": "windows",
+      "risk": "low",
+      "logo": "Media",
+      "labels": [
+        "Windows-Bordmittel"
+      ],
+      "logoPath": "img/logos/windows.svg"
+    },
+    "Windows Shell/Experience": {
+      "class": "windows",
+      "risk": "low",
+      "logo": "Win",
+      "labels": [
+        "Windows-Bordmittel"
+      ],
+      "logoPath": "img/logos/windows.svg"
+    },
+    "Windows Standard-Apps": {
+      "class": "windows",
+      "risk": "low",
+      "logo": "Win",
+      "labels": [
+        "Windows-Bordmittel"
+      ],
+      "logoPath": "img/logos/windows.svg"
+    },
+    "Windows Store Apps": {
+      "class": "windows",
+      "risk": "low",
+      "logo": "Store",
+      "labels": [
+        "Windows-Bordmittel"
+      ],
+      "logoPath": "img/logos/windows.svg"
+    },
+    "Windows Subsystem for Linux": {
+      "class": "development",
+      "risk": "medium",
+      "logo": "WSL",
+      "labels": [
+        "Entwicklung",
+        "Systemnah"
+      ],
+      "logoPath": "img/logos/windows.svg"
+    },
+    "Windows Xbox/Gaming Apps": {
+      "class": "windows",
+      "risk": "low",
+      "logo": "Xbox",
+      "labels": [
+        "Windows-Bordmittel"
+      ],
+      "logoPath": "img/logos/xbox.svg"
+    },
+    ".NET Runtime": {
+      "class": "runtime",
+      "risk": "low",
+      "logo": ".NET",
+      "labels": [
+        "Runtime",
+        "Komponente"
+      ],
+      "logoPath": "img/logos/dotnet.svg"
+    }
+  }
+}

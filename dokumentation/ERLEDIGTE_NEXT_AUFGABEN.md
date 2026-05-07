@@ -62,3 +62,7 @@ Automatisch gepflegter Verlauf erledigter Aufgaben aus `planung/NEXT.md`.
 ## 2026-05-05 22:47:58
 
 - `Automatisch aus TODO uebernommen`: Such- und Filterlogik je Tab testen.
+
+## 2026-05-06 10:54:15
+
+- `Automatisch aus TODO uebernommen`: Stammdaten-Reload mit sichtbarer Erfolg-/Fehlermeldung versehen.

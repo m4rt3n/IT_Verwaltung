@@ -9,3 +9,4 @@
 - Microsoft
 - Mozilla
 - VMware
+- Fujitsu

@@ -1,0 +1,187 @@
+[
+  {
+    "File": "7zip.svg",
+    "Slug": "7zip",
+    "Status": "OK"
+  },
+  {
+    "File": "adobe-acrobat.svg",
+    "Slug": "adobeacrobatreader",
+    "Status": "OK"
+  },
+  {
+    "File": "adobe-creative-cloud.svg",
+    "Slug": "adobecreativecloud",
+    "Status": "OK"
+  },
+  {
+    "File": "chocolatey.svg",
+    "Slug": "chocolatey",
+    "Status": "OK"
+  },
+  {
+    "File": "git.svg",
+    "Slug": "git",
+    "Status": "OK"
+  },
+  {
+    "File": "google-chrome.svg",
+    "Slug": "googlechrome",
+    "Status": "OK"
+  },
+  {
+    "File": "google-earth.svg",
+    "Slug": "googleearth",
+    "Status": "OK"
+  },
+  {
+    "File": "intellij-idea.svg",
+    "Slug": "intellijidea",
+    "Status": "OK"
+  },
+  {
+    "File": "libreoffice.svg",
+    "Slug": "libreoffice",
+    "Status": "OK"
+  },
+  {
+    "File": "microsoft-edge.svg",
+    "Slug": "microsoftedge",
+    "Status": "OK"
+  },
+  {
+    "File": "microsoft-office.svg",
+    "Slug": "microsoftoffice",
+    "Status": "OK"
+  },
+  {
+    "File": "microsoft-teams.svg",
+    "Slug": "microsoftteams",
+    "Status": "OK"
+  },
+  {
+    "File": "notepadplusplus.svg",
+    "Slug": "notepadplusplus",
+    "Status": "OK"
+  },
+  {
+    "File": "onedrive.svg",
+    "Slug": "microsoftonedrive",
+    "Status": "OK"
+  },
+  {
+    "File": "powershell.svg",
+    "Slug": "powershell",
+    "Status": "OK"
+  },
+  {
+    "File": "python.svg",
+    "Slug": "python",
+    "Status": "OK"
+  },
+  {
+    "File": "sharex.svg",
+    "Slug": "sharex",
+    "Status": "OK"
+  },
+  {
+    "File": "unity.svg",
+    "Slug": "unity",
+    "Status": "OK"
+  },
+  {
+    "File": "visual-studio.svg",
+    "Slug": "visualstudio",
+    "Status": "OK"
+  },
+  {
+    "File": "visual-studio-code.svg",
+    "Slug": "visualstudiocode",
+    "Status": "OK"
+  },
+  {
+    "File": "vlc.svg",
+    "Slug": "vlcmediaplayer",
+    "Status": "OK"
+  },
+  {
+    "File": "whatsapp.svg",
+    "Slug": "whatsapp",
+    "Status": "OK"
+  },
+  {
+    "File": "windows.svg",
+    "Slug": "windows",
+    "Status": "OK"
+  },
+  {
+    "File": "windows-terminal.svg",
+    "Slug": "windowsterminal",
+    "Status": "OK"
+  },
+  {
+    "File": "xbox.svg",
+    "Slug": "xbox",
+    "Status": "OK"
+  },
+  {
+    "File": "zoom.svg",
+    "Slug": "zoom",
+    "Status": "OK"
+  },
+  {
+    "File": "firefox.svg",
+    "Slug": "firefoxbrowser",
+    "Status": "OK"
+  },
+  {
+    "File": "putty.svg",
+    "Slug": "putty",
+    "Status": "MISSING"
+  },
+  {
+    "File": "openai.svg",
+    "Slug": "openai",
+    "Status": "OK"
+  },
+  {
+    "File": "glpi.svg",
+    "Slug": "glpi",
+    "Status": "MISSING"
+  },
+  {
+    "File": "sophos.svg",
+    "Slug": "sophos",
+    "Status": "MISSING"
+  },
+  {
+    "File": "brother.svg",
+    "Slug": "brother",
+    "Status": "MISSING"
+  },
+  {
+    "File": "canon.svg",
+    "Slug": "canon",
+    "Status": "MISSING"
+  },
+  {
+    "File": "fujitsu.svg",
+    "Slug": "fujitsu",
+    "Status": "OK"
+  },
+  {
+    "File": "aomei.svg",
+    "Slug": "aomei",
+    "Status": "MISSING"
+  },
+  {
+    "File": "macrium.svg",
+    "Slug": "macrium",
+    "Status": "MISSING"
+  },
+  {
+    "File": "winscp.svg",
+    "Slug": "winscp",
+    "Status": "MISSING"
+  }
+]
