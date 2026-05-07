@@ -53,6 +53,7 @@ Die Workflows bauen auf den vorhandenen CSV-Tabellen und Dialogen auf:
 - Formularmodale zeigen eine Pflichtfeldübersicht, bevor gespeichert wird.
 - Fachansichten bieten einen Hilfe-Button mit Kontextsprung in den Hilfe-Tab.
 - Die globale Suche kann per `Escape` geleert und per `Enter` erneut angewendet werden.
+- Knowledge-Artikel zeigen Lösungstexte in lesbaren Abschnitten und ergänzen titelbasierte Prüf-/Diagnosebefehle. Diese Befehle werden nur für das jeweilige Knowledge-Thema angezeigt, nicht global nach Kategorie verteilt.
 
 ## Erkennung und Normalisierung
 
