@@ -35,6 +35,7 @@ function renderDashboard(){
   const missingScan = (DB.assets || []).filter(a => !byAsset('hardware', a['Asset-ID']).length || !byAsset('netzwerk', a['Asset-ID']).length).length;
   const warrantyDue = dashboardWarrantyDue();
   const softwareRisks = (DB.software || []).filter(r => softwareStatusClass(r) !== 'success').length;
+  const scanStandard = (typeof softwareStandardCardRows === 'function') ? softwareStandardCardRows(filterRows(DB.software || [], 'software')).filter(r=>r.__scanStandard).length : 0;
   const writeButtons = (typeof canWrite === 'function' && canWrite())
     ? '<button class="btn btn-sm btn-outline-warning" onclick="generateRandomTickets()">Tickets generieren</button>'
     : '';
@@ -44,9 +45,11 @@ function renderDashboard(){
     ${stat('Fehlender Scan',missingScan,'secondary','Hardware oder Netzwerk fehlt',"openDashboardList('assets','scan_unknown')")}
     ${stat('Garantieablauf',warrantyDue,'info','innerhalb 90 Tagen')}
     ${stat('Software-Risiken',softwareRisks,'danger','Lizenz, Update oder Kritikalität prüfen',"openDashboardList('software','incomplete')")}
+    ${stat('Scan-Standards',scanStandard,'info','erkannte Standardsoftware',"openSoftwareScanStandards()")}
     ${stat('Assets gesamt',DB.assets.length,'primary','Inventarbestand')}
   </div>
 
+  ${renderDashboardWorkQueue(scanStandard, softwareRisks, assetIssues)}
   ${renderDataQualitySummary()}
 
   <div class="card mt-3">
@@ -73,6 +76,31 @@ function renderDashboard(){
       ${renderHeatmap()}
     </div>
   </div>`;
+}
+
+function renderDashboardWorkQueue(scanStandard, softwareRisks, assetIssues){
+  const items = [
+    {label:'Scan-Standardsoftware übernehmen', count:scanStandard, action:'openSoftwareScanStandards()', tone:'info'},
+    {label:'Software-Risiken prüfen', count:softwareRisks, action:"openDashboardList('software','incomplete')", tone:'danger'},
+    {label:'Asset-Pflichtdaten ergänzen', count:assetIssues, action:"openDashboardList('assets','incomplete')", tone:'warning'}
+  ];
+  return `<div class="card mt-3 work-queue-card">
+    <div class="card-header">Arbeitsqueue</div>
+    <div class="card-body work-queue">
+      ${items.map(item=>`<button class="work-queue-item work-queue-${item.tone}" onclick="${item.action}">
+        <span>${item.label}</span><b>${item.count}</b>
+      </button>`).join('')}
+    </div>
+  </div>`;
+}
+
+function openSoftwareScanStandards(){
+  activeKey = 'software';
+  SOFTWARE_VIEW = 'cards';
+  localStorage.setItem('softwareView', 'cards');
+  listState('software').savedView = 'scan_standard';
+  saveListState();
+  renderAll();
 }
 
 function openDashboardList(key, savedView){

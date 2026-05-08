@@ -40,6 +40,7 @@ Dieses Muster ist bewusst minimal gehalten: Es schafft einen zusammenhängenden 
 Die Workflows bauen auf den vorhandenen CSV-Tabellen und Dialogen auf:
 
 - `Neues Gerät vorbereiten`: Der bestehende Geräte-Wizard legt Asset, Hardware, Netzwerk, Standardsoftware und Startnotiz in einem Ablauf an.
+- Die Standardsoftware-Auswahl enthält kuratierte Windows-Paketgruppen für Browser, Office, Paketmanager, Runtimes, Systemtools, Diagnose, Entwicklung sowie Medien/Grafik. Winget-Paket-IDs werden in der Software-Bemerkung dokumentiert. Die Standardkarten arbeiten scan-getrieben: erkannte Standardsoftware wird nur dem eindeutig gescannten Asset zugeordnet, während Roh- und Zusatzfunde im Full-Scan bleiben.
 - `Scannerbefund prüfen`: Full-Scan-Details können als Nacharbeitsnotiz am zugeordneten Asset dokumentiert werden.
 - `Ticket aus Asset erstellen`: Die Asset-Detailansicht öffnet ein vorausgefülltes Ticket mit `Asset-ID` und `Gerätename`.
 - `Knowledge aus gelöstem Ticket`: Gelöste Tickets erzeugen nach Vorschau einen Knowledge-Eintrag mit Kategorie, Tags, Ursache, Lösung und Ticket-Quelle.
@@ -48,12 +49,16 @@ Die Workflows bauen auf den vorhandenen CSV-Tabellen und Dialogen auf:
 ## UI/UX-Stand
 
 - Dashboard-Kacheln zeigen operative Arbeitsfragen statt nur Tabellenmengen: offene Tickets, unvollständige Assets, fehlende Scans, Garantieablauf und Software-Risiken.
+- Eine Arbeitsqueue im Dashboard bündelt Scan-Standardsoftware, Software-Risiken und Asset-Pflichtdaten als direkte Sprungpunkte.
 - Tabellen nutzen kompakte Darstellung mit festem Kopf und robustem Umbruch für lange Namen, Seriennummern, Pfade und Freitext.
+- Fachansichten zeigen eine Workflow-Leiste mit Status, nächster Aktion und Kontext-Hilfe.
 - Fachansichten unterscheiden leere Daten, Suchtreffer ohne Ergebnis und fehlendes CSV-Backend.
 - Formularmodale zeigen eine Pflichtfeldübersicht, bevor gespeichert wird.
 - Fachansichten bieten einen Hilfe-Button mit Kontextsprung in den Hilfe-Tab.
 - Die globale Suche kann per `Escape` geleert und per `Enter` erneut angewendet werden.
+- Tastatur-Shortcuts: `/` fokussiert die Suche, Pfeiltasten navigieren Listen, `Ctrl+S` speichert ein geöffnetes Bearbeitungsmodal.
 - Knowledge-Artikel zeigen Lösungstexte in lesbaren Abschnitten und ergänzen titelbasierte Prüf-/Diagnosebefehle. Diese Befehle werden nur für das jeweilige Knowledge-Thema angezeigt, nicht global nach Kategorie verteilt.
+- Knowledge-Titel bleiben assetneutral. Wenn ein Artikel aus einem konkreten Gerät entstanden ist, erfolgt die Zuordnung über Tags, Tickets oder Notizen, nicht über einen Asset-Präfix im Titel.
 
 ## Erkennung und Normalisierung
 
@@ -78,7 +83,7 @@ Die Workflows bauen auf den vorhandenen CSV-Tabellen und Dialogen auf:
 - Ticket-, Software-, Status- und Kritikalitätsmodelle werden im Stammdatenbereich als fachliche Leitplanken angezeigt.
 - Netzwerktyp und Verbindungstyp bleiben getrennt: Netzwerktyp beschreibt die Klasse, Verbindungstyp die konkrete Anbindung.
 - Tags werden beim Speichern vereinheitlicht: Kleinschreibung, Semikolon-Trennung und Dublettenentfernung.
-- Der Stammdaten-Editor zeigt, ob Werte in produktiven CSV-Daten verwendet werden, warnt vor Umbenennung genutzter Werte und verhindert Löschung genutzter Werte.
+- Der Stammdaten-Editor zeigt, ob Werte in produktiven CSV-Daten verwendet werden, warnt vor Umbenennung genutzter Werte und verhindert Löschung genutzter Werte. Interne Objektbereiche wie Full-Software-Kontext oder Klassifikationskonfiguration werden dabei bewusst nicht als CSV-Zeilentabellen behandelt.
 - Stammdaten können als gestempeltes JSON exportiert und aus JSON importiert werden. Änderungen werden lokal im Browser-Audit (`localStorage`) protokolliert.
 
 ## Markt-Parität
@@ -118,6 +123,7 @@ Fuehrende Dokumente:
 - [ARCHITEKTUR.md](ARCHITEKTUR.md)
 - [REPOSITORY_AUDIT.md](REPOSITORY_AUDIT.md)
 - [UI_UX_LEITLINIE.md](UI_UX_LEITLINIE.md)
+- [JS_MODULARISIERUNG.md](JS_MODULARISIERUNG.md)
 - [IMPORT_EXPORT_KONZEPT.md](IMPORT_EXPORT_KONZEPT.md)
 - [ROADMAP_ARCHIV.md](ROADMAP_ARCHIV.md)
 - [SICHERHEITS_CHECKS_2026_05_07.md](SICHERHEITS_CHECKS_2026_05_07.md)

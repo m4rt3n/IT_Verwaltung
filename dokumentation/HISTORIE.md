@@ -4,14 +4,14 @@ Zentrale Übersicht über die gewachsenen Projektstände und Dokumentationsdatei
 
 ## Aktueller Stand
 
-- v44: Admin-Aufbau geklärt, Stammdaten-Reload sichtbar, Scanner-Start getrennt dokumentiert
+- v44: Admin-Aufbau geklärt, Stammdaten-Reload sichtbar, Scanner-Start getrennt dokumentiert, Stammdaten-Verwendungsprüfung gegen Objektbereiche abgesichert, statische App-Dateien gegen Browsercache abgesichert, Knowledge-Titel assetneutral bereinigt, Standardsoftware-Paketliste erweitert, Workflow-/UX-Leiste ergänzt
 - Datenhaltung: CSV mit serverseitigem Backup vor Schreibvorgängen
 - Web-App: lokale Bootstrap-Oberfläche mit Admin Panel
 - Scanner: PowerShell-Hardware-Scanner mit Syntaxcheck und CSV-Selbstheilung
 
 ## Build-Historie
 
-- v44: Admin-Kacheln für Datensicherung, Exporte und CSV-Wartung; sichtbarer Stammdaten-Reload-Status; getrennte Scanner-Befehlsübersicht; doppelte Helper bereinigt
+- v44: Admin-Kacheln für Datensicherung, Exporte und CSV-Wartung; sichtbarer Stammdaten-Reload-Status; getrennte Scanner-Befehlsübersicht; doppelte Helper bereinigt; Stammdaten-Verwendungsprüfung auf produktive CSV-Tabellen begrenzt; lokale JS/CSS-Dateien mit Cache-Busting; Winget/Chocolatey-Update-Knowledge ergänzt; Windows-Standardsoftwareprofil um Winget-Paketgruppen erweitert; Dashboard-Arbeitsqueue, Software-Review-Abschnitte und Tastaturfluss ergänzt
 - v43: Scanner STABLE, Self-Healing CSV, Header-Validierung, Sicherheitsabfragen, Payload-Prüfung
 - v42: PowerShell-Parserfix für Variablen direkt vor `:`
 - v40: DB-Initialisierungsfix und Safe Smart Software Layer
@@ -36,6 +36,16 @@ Zentrale Übersicht über die gewachsenen Projektstände und Dokumentationsdatei
 - `SOFTWARE_SMART_V26.md`: Software-Erkennung und Standardsoftware
 - `TOPOLOGIE_DASHBOARD.md`: Dashboard-Topologie
 - `STAMMDATEN_UI_UPGRADE.md`: Stammdatenpflege
+
+Aktuelle Knowledge-Erweiterung:
+- `KB-0103` ergänzt Office Deployment Tool, Office ADMX/ADML, Office-Update-Richtlinien und Click-to-Run-Updatebefehle in bereinigter Form ohne Product Keys oder interne Lizenzwerte.
+- `KB-0103` beschreibt zusätzlich einen 1-Klick-Installationsablauf für lokale Office-Paketordner; produktive XML/REG-Dateien bleiben außerhalb des Repositorys.
+- `KB-0103` enthält eine Profilmatrix für Microsoft 365 Current, Office LTSC 2024/2021, Standard, ProPlus, Project, Visio, LanguagePack und ProofingTools.
+- `KB-0103` beschreibt ein Wizard-Konzept zur Auswahl von Lizenzmodell, Version, Paketen, Sprachen, Updatekanal und Sicherheitsoptionen mit daraus abgeleiteter ODT-XML.
+- Die Knowledge-Karte `KB-0103` enthält nun ein integriertes Office-Auswahltool mit Schrittleiste und generierter, keyfreier `configuration.xml`.
+- Der Office-Wizard erzeugt zusätzlich `MSO-Config.reg` und `README.txt`; Registry-/Policy-Importe erfordern eine eigene Bestätigung.
+- Die Office-Wizard-Vorschau bietet temporäre Product-Key-Felder für Volumenlizenz-Produkte; diese werden nicht gespeichert und nur in die aktuelle XML-Ausgabe übernommen.
+- JavaScript wurde in erste fachliche Module zerlegt: `office-wizard.js`, `knowledge.js`, `software.js` und `device-wizard.js`; Details und weitere Schritte stehen in `JS_MODULARISIERUNG.md`.
 
 ## Umgang mit alten Dateien
 

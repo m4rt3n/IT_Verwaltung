@@ -186,6 +186,24 @@ Zu prüfen:
 - Notizen
 - Knowledge
 
+## UI-/Workflow-Prüfung
+
+Manuell im Browser:
+
+- Erwartung: Jeder Fach-Tab zeigt eine Workflow-Leiste mit passenden Arbeitsschritten und Hilfe-Button.
+- Dashboard öffnen und Arbeitsqueue-Karten anklicken.
+- Erwartung: Die App springt in die passende vorgefilterte Fachansicht.
+- Software-Tab öffnen und `Standardkarten` wählen.
+- Erwartung: Scan-Kontext zeigt eindeutig das Full-Scan-Asset.
+- Erwartung: Softwarekarten sind in `Kuratierte Standardsoftware` und `Aus Full-Scan erkannt` getrennt.
+- Eine erkannte Scan-Standardsoftware wählen.
+- Erwartung: Detailkarte zeigt `Auch installiert auf`, soweit andere Treffer vorhanden sind.
+- `In Standardsoftware übernehmen` anklicken.
+- Erwartung: Vorschau/Sicherheitsabfrage erscheint vor dem Schreiben.
+- Admin Panel öffnen.
+- Erwartung: Scanner- und Speicheraktionen sind nach Risiko markiert.
+- Tastatur prüfen: `/` fokussiert Suche, Pfeiltasten navigieren Listen, `Ctrl+S` speichert nur im geöffneten Bearbeitungsmodal.
+
 ## Rollenmodus prüfen
 
 Manuell im Browser:

@@ -104,6 +104,11 @@ function renderScannerStartPanel(){
       <div class="alert alert-warning py-2">
         Scanner und Syntaxcheck sind bewusst getrennt. Der Syntaxcheck führt keinen Inventarscan aus.
       </div>
+      <div class="admin-risk-row mb-3">
+        <span class="admin-risk admin-risk-safe">Sicher: Syntax prüfen</span>
+        <span class="admin-risk admin-risk-write">Schreibt Daten: Hardware-/Software-Scan</span>
+        <span class="admin-risk admin-risk-artifact">Artefakt: Full-Scan</span>
+      </div>
       <div class="admin-action-grid">
         ${scannerCommandTile(
           'Hardware-Scan',
@@ -144,6 +149,11 @@ function adminStoragePanel(){
     <div class="card-body">
       <div class="alert alert-info">
         Normale Sicherungen laufen über <b>eine JSON-Komplettdatei</b>. CSV-Aktionen bleiben für Wartung und direkte Arbeitsdaten reserviert.
+      </div>
+      <div class="admin-risk-row mb-3">
+        <span class="admin-risk admin-risk-safe">Sicher: Export/Vorschau</span>
+        <span class="admin-risk admin-risk-write">Schreibt Daten: Import/Speichern</span>
+        <span class="admin-risk admin-risk-backup">Backup empfohlen</span>
       </div>
       <div class="admin-action-grid">
         ${adminActionTile(

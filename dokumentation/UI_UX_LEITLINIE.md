@@ -9,6 +9,9 @@ Stand: 2026-05-07
 - Rollenmodus trennt normale Ansicht und Admin-Funktionen sichtbar.
 - Such- und Filterverhalten soll je Tab konsistent bleiben.
 - Help-Inhalte liegen lokal und werden im Tab `Hilfe` angezeigt.
+- Fachansichten zeigen eine kurze Workflow-Leiste mit aktueller Arbeitsphase und Kontext-Hilfe.
+- Scan-basierte Softwarearbeit trennt kuratierte Standardsoftware, erkannte Standardsoftware und Full-Scan-Rohdaten sichtbar.
+- Riskante Aktionen werden mit Vorschau oder Sicherheitsabfrage bestätigt.
 
 ## Begriffe
 
@@ -25,6 +28,7 @@ Stand: 2026-05-07
 - Fach-Tabs fuer Datenpflege.
 - Admin Panel fuer Backup, Import, Export, Scanner, Stammdaten und Einstellungen.
 - Hilfe als eigener Support-Tab.
+- Dashboard-Kacheln und Arbeitsqueue springen in vorgefilterte Fachansichten.
 
 ## Keine grossen UI-Umbauten
 

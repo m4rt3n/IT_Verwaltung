@@ -352,6 +352,14 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         print("[%s] %s" % (self.log_date_time_string(), fmt % args))
 
+    def end_headers(self) -> None:
+        path = urlparse(self.path).path
+        if not path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+        super().end_headers()
+
     def send_json(self, data: object, status: int = 200) -> None:
         raw = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
         self.send_response(status)

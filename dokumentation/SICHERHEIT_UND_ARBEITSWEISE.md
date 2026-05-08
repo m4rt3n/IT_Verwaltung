@@ -34,6 +34,8 @@ Die Web-App besitzt einen lokalen Rollenmodus `Admin` / `Normal`.
 
 Der Modus ist ein Bedien- und Schreibschutz in der Oberfläche, aber keine echte Authentifizierung. Im Normalmodus werden Admin- und Stammdatenbereiche ausgeblendet und Schreibaktionen durch `requireWriteAccess()` blockiert.
 
+Der lokale Webserver liefert statische App-Dateien mit `Cache-Control: no-store` aus. Dadurch werden JavaScript- und CSS-Korrekturen beim lokalen Betrieb nicht versehentlich durch veraltete Browsercache-Versionen ueberdeckt.
+
 `start.bat` erzwingt Administratorrechte über eine UAC-Abfrage, damit aus der Web-App gestartete lokale Scanner vollständiger arbeiten können. Das erhöht die Windows-Rechte des lokalen Prozesses, ersetzt aber keine Anmeldung, Rechteverwaltung oder Server-Authentifizierung.
 
 Details: [ROLLEN_RECHTE.md](ROLLEN_RECHTE.md).

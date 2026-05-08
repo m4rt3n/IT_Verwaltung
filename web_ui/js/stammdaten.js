@@ -206,8 +206,13 @@ function stammDelete(key,index){
 
 function getStammUsage(value){
   const hits = [];
-  Object.entries(DB).forEach(([table,rows])=>{
-    (rows || []).forEach(row=>{
+  const tables = ['assets','hardware','software','netzwerk','tickets','notizen','knowledge'];
+  if(typeof DB === 'undefined' || !DB) return hits;
+  tables.forEach(table=>{
+    const rows = DB[table];
+    if(!Array.isArray(rows)) return;
+    rows.forEach(row=>{
+      if(!row || typeof row !== 'object') return;
       Object.entries(row).forEach(([field,val])=>{
         if(String(val) === String(value)){
           const id = row['Asset-ID'] || row['Ticket-ID'] || row['Software-ID'] || row['Netzwerk-ID'] || row['Hardware-ID'] || row['Notiz-ID'] || row['Knowledge-ID'] || '?';

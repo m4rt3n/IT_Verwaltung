@@ -176,6 +176,7 @@ const modules = [
 ];
 let activeKey='dashboard', searchText='', selectedIndex=Object.fromEntries(modules.map(m=>[m.key,0]));
 let modalState={key:null,index:null,mode:null}, wizard={step:0,data:null};
+let officeWizardState = null;
 const LIST_STATE_KEY = 'itverwaltung-v44-list-state';
 let LIST_STATE = loadListState();
 
@@ -216,6 +217,7 @@ function applyListState(key, rows){
   if(state.savedView === 'incomplete') out = out.filter(r => missingRequiredFields(key, r).length > 0);
   if(state.savedView === 'orphan') out = out.filter(r => key !== 'assets' && r['Asset-ID'] && !CORE.findAsset(r['Asset-ID']));
   if(state.savedView === 'scan_unknown') out = out.filter(r => key === 'assets' && !hasFullScanForAsset(r));
+  if(state.savedView === 'scan_standard') out = out.filter(r => key === 'software' && /Full-Scan|Paket-ID:/i.test(String(r.Bemerkung || '')));
   if(state.filterField && state.filterValue) out = out.filter(r => String(r[state.filterField] || '') === state.filterValue);
   out.sort((a,b)=>multiSortRows(key,a,b,state.sort));
   return out;
@@ -267,7 +269,36 @@ function renderSoftwareStatus(assetId){
   }).join("");
 }
 
-async function init(){runCoreSelfTest();await loadBuildInfo();await loadServerStatus();await loadDbFromServer();await loadSoftwareFullFromServer();await loadSoftwareClassification();await loadStammdaten();if(typeof loadHelpDocs === 'function') await loadHelpDocs();const search=document.getElementById('globalSearch');search.addEventListener('input',e=>{searchText=e.target.value;render();});search.addEventListener('keydown',e=>{if(e.key==='Escape'){clearSearch();}else if(e.key==='Enter'){render();}});renderAll();}
+async function init(){runCoreSelfTest();await loadBuildInfo();await loadServerStatus();await loadDbFromServer();await loadSoftwareFullFromServer();await loadSoftwareClassification();await loadStammdaten();if(typeof loadHelpDocs === 'function') await loadHelpDocs();const search=document.getElementById('globalSearch');search.addEventListener('input',e=>{searchText=e.target.value;render();});search.addEventListener('keydown',e=>{if(e.key==='Escape'){clearSearch();}else if(e.key==='Enter'){render();}});installKeyboardShortcuts();renderAll();}
+
+function installKeyboardShortcuts(){
+  if(window.__itverwaltungShortcutsInstalled) return;
+  window.__itverwaltungShortcutsInstalled = true;
+  document.addEventListener('keydown', event => {
+    const tag = String(event.target?.tagName || '').toLowerCase();
+    const typing = ['input','textarea','select'].includes(tag);
+    if(event.key === '/' && !typing){
+      event.preventDefault();
+      document.getElementById('globalSearch')?.focus();
+      return;
+    }
+    if(event.key === 'ArrowDown' && !typing){
+      event.preventDefault();
+      nextRow(activeKey);
+      return;
+    }
+    if(event.key === 'ArrowUp' && !typing){
+      event.preventDefault();
+      prevRow(activeKey);
+      return;
+    }
+    if(event.ctrlKey && String(event.key).toLowerCase() === 's'){
+      event.preventDefault();
+      const modal = document.getElementById('editModal');
+      if(modal && modal.classList.contains('show')) saveModal();
+    }
+  });
+}
 function isAdminRole(){
   return (APP_SETTINGS.role || 'admin') === 'admin';
 }
@@ -337,7 +368,21 @@ function renderAll(){
   render();
 }
 function openTab(key){if(!visibleModules().some(m=>m.key===key))key='dashboard';activeKey=key;renderAll();}
-function render(){const mod=visibleModules().find(m=>m.key===activeKey)||visibleModules()[0];const c=document.getElementById('tabContent');c.className='pt-3 page-group-'+(mod?.group||'main');if(mod.mode==='dashboard')c.innerHTML=renderDashboard();else if(mod.mode==='asset')c.innerHTML=renderAssets();else if(mod.mode==='module')c.innerHTML=renderLinkedModule(mod);else if(mod.mode==='adminpanel')c.innerHTML=renderAdminPanel();else if(mod.mode==='stammdaten')c.innerHTML=renderStammdaten();else if(mod.mode==='help')c.innerHTML=renderHelp();else c.innerHTML=renderSimpleModule(mod);uxAnimateContent();}
+function render(){
+  const mod=visibleModules().find(m=>m.key===activeKey)||visibleModules()[0];
+  const c=document.getElementById('tabContent');
+  c.className='pt-3 page-group-'+(mod?.group||'main');
+  let html='';
+  if(mod.mode==='dashboard')html=renderDashboard();
+  else if(mod.mode==='asset')html=renderAssets();
+  else if(mod.mode==='module')html=renderLinkedModule(mod);
+  else if(mod.mode==='adminpanel')html=renderAdminPanel();
+  else if(mod.mode==='stammdaten')html=renderStammdaten();
+  else if(mod.mode==='help')html=renderHelp();
+  else html=renderSimpleModule(mod);
+  c.innerHTML=renderWorkflowBar(mod)+html;
+  uxAnimateContent();
+}
 
 function renderBuildInfoCard(){
   return `<div class="card mt-3 build-info-card">
@@ -536,6 +581,54 @@ function uxAnimateContent(){
 }
 let DASHBOARD_VIEW = localStorage.getItem('dashboardView') || APP_SETTINGS.startView || 'topology';
 
+function renderWorkflowBar(mod){
+  if(!mod || mod.mode === 'help') return '';
+  const steps = workflowStepsFor(mod);
+  const active = workflowActiveStep(mod);
+  const help = contextHelpButton(mod.key);
+  return `<div class="workflow-bar mb-3">
+    <div class="workflow-steps" aria-label="Workflow">
+      ${steps.map((step,index)=>`<span class="workflow-step ${index<=active?'active':''}">${index+1}. ${safeEscape(step)}</span>`).join('')}
+    </div>
+    <div class="workflow-actions">
+      ${workflowPrimaryAction(mod)}
+      ${help}
+    </div>
+  </div>`;
+}
+
+function workflowStepsFor(mod){
+  if(mod.key === 'software') return ['Scan laden','Asset prüfen','Standard abgleichen','Full-Scan nacharbeiten'];
+  if(mod.key === 'assets') return ['Asset wählen','Details prüfen','Nacharbeit starten','Dokumentieren'];
+  if(mod.key === 'tickets') return ['Ticket wählen','Ursache klären','Lösung dokumentieren','Knowledge erstellen'];
+  if(mod.key === 'knowledge') return ['Thema wählen','Lösung lesen','Befehl prüfen','Anwenden'];
+  if(mod.key === 'adminpanel') return ['Backup prüfen','Scanner wählen','Aktion bestätigen','Ergebnis prüfen'];
+  if(mod.key === 'stammdaten') return ['Liste wählen','Verwendung prüfen','Ändern','Reload'];
+  if(mod.key === 'dashboard') return ['Überblick','Hinweis öffnen','Nacharbeit','Bericht'];
+  return ['Eintrag wählen','Kontext prüfen','Bearbeiten','Speichern'];
+}
+
+function workflowActiveStep(mod){
+  if(mod.key === 'software'){
+    if(SOFTWARE_VIEW === 'full') return 3;
+    if(DB.softwareFull?.available && softwareExactScanAsset()) return 2;
+    if(DB.softwareFull?.available) return 1;
+    return 0;
+  }
+  if(String(searchText || '').trim()) return 1;
+  return 0;
+}
+
+function workflowPrimaryAction(mod){
+  if(mod.key === 'software'){
+    if(!DB.softwareFull?.available) return '<button class="btn btn-sm btn-outline-primary" onclick="activeKey=\'adminpanel\';renderAll()">Scanner öffnen</button>';
+    if(SOFTWARE_VIEW !== 'full') return '<button class="btn btn-sm btn-outline-primary" onclick="setSoftwareView(\'full\')">Full-Scan</button>';
+  }
+  if(mod.key === 'dashboard') return '<button class="btn btn-sm btn-outline-secondary" onclick="exportDashboardReport()">Prüfbericht</button>';
+  if(mod.key === 'assets' && canWrite()) return '<button class="btn btn-sm btn-primary" onclick="openDeviceWizard()">Neues Gerät</button>';
+  return '';
+}
+
 function contextHeader(mod){
   if(!mod.context) return '';
   const data = {
@@ -611,9 +704,15 @@ function emptyStateFor(key){
     return `<div class="alert alert-warning py-2 mb-2">CSV Backend nicht verbunden. Starte die App über <b>start.bat</b>, damit lokale Daten geladen und gespeichert werden können.</div>`;
   }
   if(String(searchText || '').trim()){
-    return `<div class="alert alert-info py-2 mb-2">Keine Treffer für die aktuelle Suche im Tab <b>${safeEscape(key || 'Daten')}</b>.</div>`;
+    return `<div class="alert alert-info py-2 mb-2">Keine Treffer für die aktuelle Suche im Tab <b>${safeEscape(key || 'Daten')}</b>. <button class="btn btn-sm btn-outline-primary ms-2" onclick="clearSearch()">Suche löschen</button></div>`;
   }
-  return `<div class="alert alert-secondary py-2 mb-2">Noch keine Daten im Tab <b>${safeEscape(key || 'Daten')}</b> vorhanden.</div>`;
+  const actions = {
+    software:'<button class="btn btn-sm btn-outline-primary" onclick="setSoftwareView(\'full\')">Full-Scan prüfen</button> <button class="btn btn-sm btn-primary" onclick="openSoftwareProfileCreate()">Standardsoftware hinzufügen</button>',
+    assets:'<button class="btn btn-sm btn-primary" onclick="openDeviceWizard()">Neues Gerät erfassen</button>',
+    tickets:'<button class="btn btn-sm btn-primary" onclick="openReferenceCreate(\'tickets\')">Ticket zu Asset</button>',
+    knowledge:'<button class="btn btn-sm btn-outline-primary" onclick="openContextHelp(\'faq\')">Hilfe öffnen</button>'
+  }[key] || '';
+  return `<div class="alert alert-secondary py-2 mb-2">Noch keine Daten im Tab <b>${safeEscape(key || 'Daten')}</b> vorhanden. ${actions}</div>`;
 }
 
 function contextHelpButton(key){
@@ -682,7 +781,28 @@ function renderListControls(key, sourceRows){
     ${key==='tickets'?`<button class="btn btn-sm btn-outline-secondary ${state.savedView==='open_tickets'?'active':''}" onclick="setListState('${key}','savedView',listState('${key}').savedView==='open_tickets'?'':'open_tickets')">Offene Tickets</button>`:''}
     ${key==='assets'?`<button class="btn btn-sm btn-outline-secondary ${state.savedView==='scan_unknown'?'active':''}" onclick="setListState('${key}','savedView',listState('${key}').savedView==='scan_unknown'?'':'scan_unknown')">Scan unbekannt</button>`:''}
     <button class="btn btn-sm btn-outline-secondary" onclick="LIST_STATE['${key}']={sort:'smart',group:'none',filterField:'',filterValue:'',savedView:''};saveListState();render()">Zurücksetzen</button>
+    ${renderQuickFilterChips(key)}
   </div></div>`;
+}
+
+function renderQuickFilterChips(key){
+  const chips = {
+    software:[
+      ['scan_standard','Scan-Standard'],
+      ['incomplete','Prüfen'],
+      ['orphan','Ohne Asset']
+    ],
+    assets:[
+      ['incomplete','Unvollständig'],
+      ['scan_unknown','Scan fehlt']
+    ],
+    tickets:[
+      ['open_tickets','Offen'],
+      ['incomplete','Pflichtfelder']
+    ]
+  }[key] || [];
+  if(!chips.length) return '';
+  return `<div class="quick-filter-chips">${chips.map(([view,label])=>`<button class="btn btn-sm btn-outline-primary ${listState(key).savedView===view?'active':''}" onclick="setListState('${key}','savedView',listState('${key}').savedView==='${view}'?'':'${view}')">${label}</button>`).join('')}</div>`;
 }
 
 function openContextHelp(slug){
@@ -712,947 +832,6 @@ function renderAssets(){
   return renderListControls('assets', sourceRows) + actions + renderSplit('assets', rows, assetColumns(), row, renderAssetCard(row, idx, rows.length));
 }
 
-// ===== v27 SOFTWARE UI =====
-let SOFTWARE_VIEW = localStorage.getItem('softwareView') || 'cards';
-let SOFTWARE_FULL_SELECTED = 0;
-const SOFTWARE_FULL_SCOPES = ['apps','productivity','admin','development','security','drivers','runtimes','windows','services','unknown','components','system','all'];
-const STORED_SOFTWARE_FULL_SCOPE = localStorage.getItem('softwareFullScope') || 'apps';
-let SOFTWARE_FULL_SCOPE = SOFTWARE_FULL_SCOPES.includes(STORED_SOFTWARE_FULL_SCOPE) ? STORED_SOFTWARE_FULL_SCOPE : 'apps';
-
-const SOFTWARE_FULL_FAMILY_RULES = [
-  {family:'Microsoft Visual C++ Redistributable', category:'component', patterns:[/Microsoft\.VCRedist/i,/Visual C\+\+/i,/VCLibs/i]},
-  {family:'.NET Runtime', category:'component', patterns:[/Microsoft\.DotNet/i,/\.NET Host/i,/\.NET Runtime/i,/ASP\.NET Core/i,/Windows Desktop Runtime/i,/NET\.Native/i]},
-  {family:'Windows App Runtime', category:'component', patterns:[/WindowsAppRuntime/i,/WinAppRuntime/i]},
-  {family:'Microsoft VCLibs', category:'component', patterns:[/^VCLibs/i,/Microsoft\.VCLibs/i]},
-  {family:'Python', category:'app', patterns:[/^Python\s+\d/i,/Python Launcher/i,/^pip$/i,/^pipx$/i]},
-  {family:'Adobe Acrobat', category:'app', patterns:[/Acrobat/i,/Adobe Refresh Manager/i,/Adobe Notification Client/i,/AdobeAcrobat/i,/AdobeUpdateService/i]},
-  {family:'Adobe Creative Cloud', category:'app', patterns:[/Adobe Creative Cloud/i]},
-  {family:'Microsoft Office', category:'app', patterns:[/Microsoft Office/i,/MicrosoftOfficeHub/i,/Office 16 Click-to-Run/i,/OfficePushNotification/i]},
-  {family:'LibreOffice', category:'app', patterns:[/LibreOffice/i,/^soffice$/i]},
-  {family:'Microsoft Edge', category:'app', patterns:[/^Microsoft Edge$/i,/MicrosoftEdge\.Stable/i,/Edge\.GameAssist/i,/Microsoft Edge-Spielhilfe/i]},
-  {family:'Microsoft Edge WebView2', category:'component', patterns:[/WebView2/i]},
-  {family:'Visual Studio Code', category:'app', patterns:[/Visual Studio Code/i,/VisualStudioCode/i,/^Code$/i,/VS Code/i]},
-  {family:'Microsoft Visual Studio', category:'app', patterns:[/Visual Studio Installer/i,/Visual Studio Setup/i,/Visual Studio Installer Elevation Service/i]},
-  {family:'Chocolatey', category:'app', patterns:[/^chocolatey$/i,/Chocolatey/i]},
-  {family:'7-Zip', category:'app', patterns:[/^7-Zip/i,/^7zFM$/i]},
-  {family:'AOMEI Backupper', category:'app', patterns:[/AOMEI Backupper/i]},
-  {family:'Google Chrome', category:'app', patterns:[/^Google Chrome$/i,/^Chrome$/i,/GoogleChromeElevationService/i]},
-  {family:'Google Updater', category:'component', patterns:[/Google Updater/i]},
-  {family:'Google Earth Pro', category:'app', patterns:[/Google Earth Pro/i]},
-  {family:'Macrium Reflect', category:'app', patterns:[/Macrium Reflect/i,/Macrium Service/i]},
-  {family:'Microsoft Teams', category:'app', patterns:[/^MSTeams$/i,/Microsoft Teams/i]},
-  {family:'PowerToys', category:'app', patterns:[/PowerToys/i]},
-  {family:'VLC media player', category:'app', patterns:[/^vlc$/i,/VLC media player/i]},
-  {family:'WinSCP', category:'app', patterns:[/^WinSCP/i]},
-  {family:'AnyToISO', category:'app', patterns:[/AnyToISO/i]},
-  {family:'Git', category:'app', patterns:[/^Git$/i,/Git\.Git/i]},
-  {family:'ShareX', category:'app', patterns:[/ShareX/i]},
-  {family:'WhatsApp', category:'app', patterns:[/WhatsApp/i]},
-  {family:'Notepad++', category:'app', patterns:[/notepad\+\+/i,/Notepad\+\+/i]},
-  {family:'Sysinternals', category:'app', patterns:[/SysInternals/i,/Sysinternals/i]},
-  {family:'ChatGPT', category:'app', patterns:[/^ChatGPT/i]},
-  {family:'PowerShell', category:'app', patterns:[/^PowerShell\s*7/i]},
-  {family:'OneDrive', category:'app', patterns:[/OneDrive/i]},
-  {family:'Mozilla Firefox', category:'app', patterns:[/^firefox$/i,/Mozilla Firefox/i]},
-  {family:'PuTTY', category:'app', patterns:[/^putty$/i,/PuTTY release/i]},
-  {family:'Zoom Workplace', category:'app', patterns:[/^Zoom$/i,/Zoom Workplace/i]},
-  {family:'IntelliJ IDEA Community', category:'app', patterns:[/IntelliJ IDEA Community/i]},
-  {family:'Unity', category:'app', patterns:[/^Unity\s+\d/i,/Unity Hub/i]},
-  {family:'Windows ADK', category:'component', patterns:[/Application Compatibility Toolkit/i,/Assessment/i,/Assessment and Deployment Kit/i,/WindowsADK/i,/Deployment Image Servicing/i,/Imaging (And )?(Configuration )?Designer/i,/Imaging Tools Support/i,/User State Migration Tool/i,/BCD and Boot/i,/DefaultPackMSI/i,/Kits Configuration Installer/i,/OA3Tool/i,/OACheck/i,/OATool/i,/Oscdimg/i,/Supply Chain Trust Tools ADK/i,/Toolkit Documentation/i,/UEV Tools/i,/Volume Activation Management Tool/i,/Windows Assessment Toolkit/i,/Windows Deployment/i,/Windows PE/i,/Windows Setup Files/i,/Windows System Image Manager/i,/WPT/i]},
-  {family:'Sophos Endpoint Security', category:'component', patterns:[/^Sophos/i]},
-  {family:'Brother Drucker/Scanner Suite', category:'app', patterns:[/^Brother/i,/^Br[A-Z]/i,/ControlCenter4/i,/StatusMonitor/i,/UsbRepairTool/i,/NetworkRepairTool/i,/HowToGuide/i,/AppLogLibSetup/i]},
-  {family:'Paragon Partition Manager', category:'app', patterns:[/Paragon Partition Manager/i,/Paragon Block Device Mounter/i]},
-  {family:'Canon Druckertreiber', category:'component', patterns:[/Canon.*Druckertreiber/i,/Canon Generic Plus/i]},
-  {family:'Fujitsu DeskUpdate', category:'app', patterns:[/DeskUpdate/i]},
-  {family:'Epic Online Services', category:'component', patterns:[/Epic Online Services/i]},
-  {family:'GLPI Agent', category:'component', patterns:[/GLPI Agent/i]},
-  {family:'Mozilla Maintenance Service', category:'component', patterns:[/Mozilla Maintenance Service/i]},
-  {family:'Windows Subsystem for Linux', category:'app', patterns:[/Windows Subsystem for Linux/i,/Windows-Subsystem für Linux/i]},
-  {family:'Microsoft XNA Framework', category:'component', patterns:[/XNA Framework/i,/Microsoft\.XNARedist/i]},
-  {family:'Windows Medienerweiterungen', category:'system', patterns:[/AV1 ?Video Extension/i,/AV1VideoExtension/i,/AVC ?Encoder/i,/AVCEncoderVideoExtension/i,/HEIF/i,/HEVC/i,/MPEG-?2/i,/MPEG2VideoExtension/i,/Raw Image Extension/i,/RawImageExtension/i,/VP9/i,/WebMediaExtensions/i,/Webmedienerweiterungen/i,/WebP/i,/WebpImageExtension/i]},
-  {family:'Windows Xbox/Gaming Apps', category:'system', patterns:[/^Xbox$/i,/XboxGame/i,/XboxGaming/i,/XboxIdentity/i,/XboxSpeech/i,/Game Bar/i,/Game Speech Window/i,/GamingApp/i,/Solitaire/i,/MicrosoftSolitaireCollection/i]},
-  {family:'Windows Store Apps', category:'system', patterns:[/Microsoft Store/i,/WindowsStore/i,/StorePurchaseApp/i,/DesktopAppInstaller/i,/Host der Store-Benutzeroberfläche/i]},
-  {family:'Windows Standard-Apps', category:'system', patterns:[/BingNews/i,/BingSearch/i,/BingWeather/i,/Microsoft Bing/i,/Microsoft Fotos/i,/Fotos/i,/Photos/i,/WindowsCamera/i,/Windows-Kamera/i,/WindowsCalculator/i,/Windows-Rechner/i,/WindowsAlarms/i,/Windows-Uhr/i,/WindowsSoundRecorder/i,/Windows-Audiorekorder/i,/WindowsNotepad/i,/Windows-Editor/i,/WindowsFeedbackHub/i,/Feedback-Hub/i,/WindowsMaps/i,/Windows-Karten/i,/GetHelp/i,/Hilfe anfordern/i,/Getstarted/i,/People/i,/Microsoft Kontakte/i,/Todos/i,/Microsoft To Do/i,/OutlookForWindows/i,/Outlook for Windows/i,/Paint$/i,/ScreenSketch/i,/Snipping Tool/i,/ZuneMusic/i,/ZuneVideo/i,/Filme & TV/i,/Windows Medienwiedergabe/i,/Mail und Kalender/i,/windowscommunicationsapps/i,/Smartphone-Link/i,/Geräteübergreifender Funktions-Host/i,/Power Automate/i,/PowerAutomate/i]},
-  {family:'Windows Shell/Experience', category:'system', patterns:[/ApplicationCompatibilityEnhancements/i,/CrossDevice/i,/DevHome/i,/LanguageExperiencePack/i,/Deutsch Local Experience Pack/i,/NcsiUwpApp/i,/QuickAssist/i,/Remotehilfe/i,/SecHealthUI/i,/Services\.Store\.Engagement/i,/Start Experiences-App/i,/StartExperiencesApp/i,/WidgetsPlatformRuntime/i,/Windows Advanced Settings/i,/Windows Web Experience Pack/i,/Winget\.(Fonts\.)?Source/i]}
-];
-
-const SOFTWARE_FULL_SYSTEM_PATTERNS = [
-  /^Microsoft\.Windows/i,
-  /^Windows\./i,
-  /^Microsoft\.(AAD|AccountsControl|AsyncTextService|BioEnrollment|CredentialDialogHost|LockApp|SecHealthUI|WindowsStore)/i,
-  /^(StartExperiencesApp|CrossDevice|YourPhone|Xbox\.|Xbox TCUI|Clipchamp|Copilot|Microsoft 365 Copilot|Microsoft Search in Bing|App-Installer|Windows Installer)$/i,
-  /^(Speion|Voiess)$/i
-];
-
-function setSoftwareView(view){
-  SOFTWARE_VIEW = view;
-  localStorage.setItem('softwareView', view);
-  render();
-}
-
-function setSoftwareFullSelected(i){
-  SOFTWARE_FULL_SELECTED = i;
-  render();
-}
-
-function setSoftwareFullScope(scope){
-  SOFTWARE_FULL_SCOPE = SOFTWARE_FULL_SCOPES.includes(scope) ? scope : 'apps';
-  SOFTWARE_FULL_SELECTED = 0;
-  localStorage.setItem('softwareFullScope', SOFTWARE_FULL_SCOPE);
-  render();
-}
-
-function softwareFullBaseRows(){
-  const full = DB.softwareFull || {};
-  const rows = Array.isArray(full.rows) ? full.rows : [];
-  const q = searchText.trim().toLowerCase();
-  return rows
-    .filter(r=>!q || Object.values(r).join(' ').toLowerCase().includes(q))
-    .filter(r=>String(r.Name || '').trim() && String(r.Name || '').trim() !== '-');
-}
-
-function softwareFullRows(){
-  const filtered = softwareFullBaseRows()
-    .filter(r=>{
-      const category = softwareFullCategory(r);
-      const swClass = softwareFullClass(r);
-      if(SOFTWARE_FULL_SCOPE === 'all') return true;
-      if(SOFTWARE_FULL_SCOPE === 'apps') return category === 'app';
-      if(SOFTWARE_FULL_SCOPE === 'productivity') return swClass === 'productivity';
-      if(SOFTWARE_FULL_SCOPE === 'admin') return swClass === 'admin';
-      if(SOFTWARE_FULL_SCOPE === 'development') return swClass === 'development';
-      if(SOFTWARE_FULL_SCOPE === 'security') return swClass === 'security';
-      if(SOFTWARE_FULL_SCOPE === 'drivers') return swClass === 'driver';
-      if(SOFTWARE_FULL_SCOPE === 'runtimes') return swClass === 'runtime';
-      if(SOFTWARE_FULL_SCOPE === 'windows') return swClass === 'windows';
-      if(SOFTWARE_FULL_SCOPE === 'services') return swClass === 'service';
-      if(SOFTWARE_FULL_SCOPE === 'unknown') return swClass === 'unclear';
-      if(SOFTWARE_FULL_SCOPE === 'components') return category === 'component';
-      if(SOFTWARE_FULL_SCOPE === 'system') return category === 'system';
-      return category === 'app';
-    });
-  return compactSoftwareFullRows(filtered);
-}
-
-function softwareFullCategory(row){
-  const family = softwareFullFamily(row);
-  if(family?.category) return family.category;
-  if(isWindowsSystemSoftware(row)) return 'system';
-  if(isSoftwareComponent(row)) return 'component';
-  return 'app';
-}
-
-function isWindowsSystemSoftware(row){
-  const name = String(row.DisplayName || row.Name || '').trim();
-  const publisher = String(row.Publisher || row.Hersteller || '');
-  const packageType = String(row.PackageType || row.Pakettyp || '');
-  const path = String(row.InstallLocation || row.RawPath || row.RawSourceKey || '');
-  const normalizedPath = path.replaceAll('/', '\\').toLowerCase();
-  const source = String(row.Sources || row.Source || row.Quelle || '');
-
-  if(/\b(Service|Driver)\b/i.test(packageType)) return true;
-  if(/CN=Microsoft Windows/i.test(publisher)) return true;
-  if(SOFTWARE_FULL_SYSTEM_PATTERNS.some(pattern=>pattern.test(name))) return true;
-  if(/CN=Microsoft Corporation/i.test(publisher) && /Appx\/MSIX/i.test(packageType) && SOFTWARE_FULL_SYSTEM_PATTERNS.some(pattern=>pattern.test(name))) return true;
-  if(['\\windows\\systemapps\\','\\windows\\winsxs\\','\\windows\\system32\\','\\windows\\syswow64\\'].some(part=>normalizedPath.includes(part))) return true;
-  if(/^(Microsoft\.Windows|Windows\.|Microsoft\.UI\.Xaml|UI\.Xaml|Microsoft\.VCLibs|Microsoft\.NET\.Native|Microsoft\.Services\.Store)/i.test(name)) return true;
-  if(/^Microsoft\.(AAD|AccountsControl|AsyncTextService|BioEnrollment|CredentialDialogHost|LockApp|SecHealthUI|WindowsStore)/i.test(name)) return true;
-  if(/HKEY_USERS_S-1-5-(18|19|20)/i.test(source)) return true;
-  return false;
-}
-
-function isSoftwareComponent(row){
-  const name = String(row.DisplayName || row.Name || '').trim();
-  const publisher = String(row.Publisher || row.Hersteller || '');
-  const packageType = String(row.PackageType || row.Pakettyp || '');
-  const blob = `${name} ${publisher} ${packageType}`.toLowerCase();
-  if(/\b(runtime|redistributable|webview|vclibs|framework|sdk|dependency|library|driver package|hosting bundle|shared framework|desktop runtime|native runtime)\b/i.test(blob)) return true;
-  if(/\b(update service|updater|notification client|refresh manager|helper|maintenance service|crash reporter|telemetry|licensing service|scheduler service)\b/i.test(blob)) return true;
-  if(/^(adobe(acrobaticondccoreapp|notificationclient)|acrobat notification client|adobe notification client|adobe refresh manager)$/i.test(name.replace(/\s+/g, ' ').trim())) return true;
-  return false;
-}
-
-function softwareFullCategoryCounts(rows){
-  return rows.reduce((acc,row)=>{
-    const category = softwareFullCategory(row);
-    acc[category] = (acc[category] || 0) + 1;
-    return acc;
-  }, {app:0, component:0, system:0});
-}
-
-function softwareFullClassCounts(rows){
-  return rows.reduce((acc,row)=>{
-    const swClass = softwareFullClass(row);
-    acc[swClass] = (acc[swClass] || 0) + 1;
-    return acc;
-  }, {});
-}
-
-function softwareFullDisplayName(row){
-  let name = String(row.DisplayName || row.Name || '').trim();
-  if(!name) return 'Software';
-  const family = softwareFullFamily({...row, Name:name, DisplayName:''});
-  if(family) return family.family;
-  name = name.replace(/^[A-Z0-9]{4,}\./, '');
-  name = name.replace(/^(Microsoft|Windows)\./, '');
-  name = name.replace(/Desktop$/i, '');
-  name = name.replace(/\s+app$/i, '');
-  const normalizedFamily = softwareFullFamily({...row, Name:name, DisplayName:''});
-  if(normalizedFamily) return normalizedFamily.family;
-  if(/^Chocolatey/i.test(name)) return 'Chocolatey';
-  if(/^Microsoft Visual Studio Code/i.test(name) || /^Visual Studio Code/i.test(name)) return 'Visual Studio Code';
-  if(/^Python\s+\d/i.test(name) && !/^Python Launcher/i.test(name)) return 'Python';
-  if(/^Microsoft Edge$|^MicrosoftEdge\.Stable$/i.test(name)) return 'Microsoft Edge';
-  if(/^Microsoft Office LTSC|^MicrosoftOfficeHub$/i.test(name)) return 'Microsoft Office';
-  if(/^LibreOffice/i.test(name) || /^soffice$/i.test(name)) return 'LibreOffice';
-  const aliasKey = name.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
-  const aliases = {
-    '7zfm':'7-Zip',
-    '7zip':'7-Zip',
-    'acrord32':'Adobe Acrobat Reader',
-    'acrobatreader':'Adobe Acrobat Reader',
-    'adobeacrobat64bit':'Adobe Acrobat',
-    'adobeacrobat':'Adobe Acrobat',
-    'adobeacrobatdccoreapp':'Adobe Acrobat',
-    'adobeacrobaticondccoreapp':'Adobe Acrobat',
-    'acrobatnotificationclient':'Adobe Acrobat',
-    'adobenotificationclient':'Adobe Acrobat',
-    'adoberefreshmanager':'Adobe Acrobat',
-    'chocolateyinstallonly':'Chocolatey',
-    'chocolateygui':'Chocolatey',
-    'code':'Visual Studio Code',
-    'microsoftvisualstudiocodeuser':'Visual Studio Code',
-    'microsoftvisualstudiocodecli':'Visual Studio Code',
-    'soffice':'LibreOffice',
-    whatsappdesktop:'WhatsApp',
-    whatsapp:'WhatsApp',
-    googlechrome:'Google Chrome',
-    chrome:'Google Chrome',
-    microsoftteams:'Microsoft Teams',
-    teams:'Microsoft Teams'
-  };
-  return aliases[aliasKey] || name.trim();
-}
-
-function softwareFullFamily(row){
-  const name = String(row.DisplayName || row.Name || '').trim();
-  const publisher = String(row.Publisher || row.Hersteller || '').trim();
-  const packageType = String(row.PackageType || row.Pakettyp || '').trim();
-  const source = String(row.Sources || row.Source || row.Quelle || '').trim();
-  const raw = String(row.RawSourceKey || row.RawPath || row.InstallLocation || '').trim();
-  const haystack = `${name} ${publisher} ${packageType} ${source} ${raw}`;
-  const fields = [name, publisher, packageType, source, raw, haystack];
-  return SOFTWARE_FULL_FAMILY_RULES.find(rule=>rule.patterns.some(pattern=>fields.some(value=>pattern.test(value)))) || null;
-}
-
-function softwareFullProductHint(row){
-  const config = DB.softwareClassification || {};
-  const hints = config.productHints || {};
-  const name = String(row.DisplayName || softwareFullDisplayName(row) || '').trim();
-  return hints[name] || {};
-}
-
-function softwareFullClass(row){
-  const hint = softwareFullProductHint(row);
-  if(hint.class) return hint.class;
-  const category = softwareFullCategory(row);
-  const packageType = String(row.PackageType || row.Pakettyp || '').toLowerCase();
-  const name = String(row.DisplayName || row.Name || '').toLowerCase();
-  const publisher = String(row.Publisher || row.Hersteller || '').toLowerCase();
-  if(category === 'system') return 'windows';
-  if(packageType.includes('driver')) return 'driver';
-  if(packageType.includes('service')) return 'service';
-  if(category === 'component') return 'runtime';
-  if(/defender|sophos|security|antivirus|bitlocker|firewall|endpoint/.test(`${name} ${publisher}`)) return 'security';
-  if(/powershell|putty|winscp|sysinternals|chocolatey|uniget|winget|glpi|deskupdate|backup|partition|remote|ssh|scanner/.test(name)) return 'admin';
-  if(/python|git|visual studio|code|intellij|unity|node|npm|java|jdk|sdk/.test(name)) return 'development';
-  if(!publisher || publisher === '-' || String(row.DetectionConfidence || '').toLowerCase() === 'low') return 'unclear';
-  return 'productivity';
-}
-
-function softwareFullClassLabel(row){
-  const labels = (DB.softwareClassification || {}).classLabels || {};
-  const swClass = softwareFullClass(row);
-  return labels[swClass] || swClass || 'Unklar';
-}
-
-function softwareFullRisk(row){
-  const hint = softwareFullProductHint(row);
-  if(hint.risk) return hint.risk;
-  const swClass = softwareFullClass(row);
-  if(['admin','security'].includes(swClass)) return 'high';
-  if(['development','driver','productivity'].includes(swClass)) return 'medium';
-  return 'low';
-}
-
-function softwareFullLabels(row){
-  const hint = softwareFullProductHint(row);
-  const labels = new Set(Array.isArray(hint.labels) ? hint.labels : []);
-  const swClass = softwareFullClass(row);
-  const scope = String(row.Scope || row.BenutzerKontext || '').toLowerCase();
-  const packageType = String(row.PackageType || row.Pakettyp || '').toLowerCase();
-  const confidence = String(row.DetectionConfidence || '').toLowerCase();
-  if(swClass === 'windows') labels.add('Windows-Bordmittel');
-  if(swClass === 'runtime') labels.add('Komponente');
-  if(swClass === 'admin') labels.add('Admin-/IT-Tool');
-  if(swClass === 'development') labels.add('Entwicklung');
-  if(swClass === 'security') labels.add('Security-relevant');
-  if(packageType.includes('portable')) labels.add('Portable');
-  if(scope.includes('user')) labels.add('Benutzerinstallation');
-  if(confidence === 'low' || swClass === 'unclear') labels.add('Pruefen');
-  scannerUncertaintyLabels(row).forEach(label => labels.add(label));
-  return Array.from(labels);
-}
-
-function softwareFullProfileStatus(row){
-  const asset = softwareFullAsset(row);
-  const config = DB.softwareClassification || {};
-  const profiles = config.standardProfiles || {};
-  const type = asset?.['Asset-Typ'] || 'Desktop';
-  const profile = profiles[type] || profiles.Desktop || [];
-  const name = row.DisplayName || softwareFullDisplayName(row);
-  if(!Array.isArray(profile) || !profile.length) return 'Kein Profil';
-  return profile.includes(name) ? 'Standardprofil' : 'Zusatzsoftware';
-}
-
-function softwareFullLogo(row){
-  const hint = softwareFullProductHint(row);
-  if(hint.logo) return hint.logo;
-  const name = String(row.DisplayName || softwareFullDisplayName(row) || '').trim();
-  return name.split(/\s+/).slice(0,2).map(part=>part[0]).join('').toUpperCase() || 'SW';
-}
-
-function softwareFullLogoPath(row){
-  const hint = softwareFullProductHint(row);
-  return hint.logoPath || '';
-}
-
-function renderSoftwareFullLogo(row, size='list'){
-  const path = softwareFullLogoPath(row);
-  const text = softwareFullLogo(row);
-  const title = row.DisplayName || softwareFullDisplayName(row);
-  if(path){
-    return `<span class="software-logo-mark software-logo-${size}" title="${safeEscape(title)}"><img src="${safeEscape(path)}" alt="${safeEscape(title)} Logo" onerror="this.style.display='none';this.parentNode.classList.add('logo-fallback');this.parentNode.dataset.logo='${safeEscape(text)}';"></span>`;
-  }
-  return `<span class="software-logo-mark software-logo-${size} logo-fallback" data-logo="${safeEscape(text)}" title="${safeEscape(title)}"></span>`;
-}
-
-function softwareFullUpdateAssessment(row){
-  const normalized = normalizeUpdateStatus(row);
-  if(normalized === 'UpdateAvailable'){
-    const latest = row.LatestVersion ? ` -> ${row.LatestVersion}` : '';
-    return `Update verfuegbar${latest} (${row.UpdateSource || 'Quelle unbekannt'})`;
-  }
-  if(normalized === 'Current') return 'Aktuell';
-  if(normalized === 'Error') return 'Update-Pruefung fehlerhaft';
-  if(normalized === 'Unknown') return 'Update unbekannt';
-  if(row.UpdateStatus === 'NoUpdateKnown') return 'Kein Update aus Quellen bekannt';
-  if(normalized === 'NotChecked') return 'Update nicht geprüft';
-  const source = String(row.Sources || row.Source || row.Quelle || '').toLowerCase();
-  const swClass = softwareFullClass(row);
-  if(swClass === 'windows' || swClass === 'runtime') return 'System-/Komponentenpflege';
-  if(source.includes('winget')) return 'Winget erkannt, Upgrade-Abgleich möglich';
-  if(source.includes('choco')) return 'Chocolatey erkannt, Upgrade-Abgleich möglich';
-  if(source.includes('pip') || source.includes('npm')) return 'Paketmanager erkannt, Version prüfen';
-  return 'Manuell prüfen';
-}
-
-function normalizeUpdateStatus(row){
-  const raw = String(row.UpdateStatus || row['Update-Status'] || '').toLowerCase();
-  const available = String(row.UpdateAvailable || '').toLowerCase();
-  if(available === 'true' || raw.includes('available') || raw.includes('verfüg') || raw.includes('verfueg')) return 'UpdateAvailable';
-  if(raw.includes('current') || raw.includes('aktuell') || raw.includes('ok')) return 'Current';
-  if(raw.includes('error') || raw.includes('fehler') || raw.includes('warn')) return 'Error';
-  if(raw.includes('notchecked') || raw.includes('not checked') || raw.includes('nicht geprüft') || raw.includes('nicht gepr')) return 'NotChecked';
-  if(raw.includes('unknown') || raw.includes('unbekannt')) return 'Unknown';
-  return raw ? 'Unknown' : 'NotChecked';
-}
-
-function scannerUncertaintyLabels(row){
-  const labels = [];
-  const type = String(row['Asset-Typ'] || row.DeviceType || '').trim().toLowerCase();
-  const connection = String(row.Verbindungstyp || row.ConnectionType || '').trim().toLowerCase();
-  const blob = Object.values(row || {}).join(' ').toLowerCase();
-  if(type === 'desktop') labels.push('Typ Desktop pruefen');
-  if(connection === '' || connection === 'lan/wlan') labels.push('Verbindung unsicher');
-  if(/to be filled|system product name|o\.e\.m\.|oem|default string|not specified|unknown/i.test(blob)) labels.push('OEM-Platzhalter');
-  return labels;
-}
-
-function softwareFullSourceTrust(row){
-  const source = String(row.Sources || row.Source || row.Quelle || row.PackageType || row.Pakettyp || '').toLowerCase();
-  if(source.includes('winget') || source.includes('registry')) return {level:'hoch', text:'Hohe Verlässlichkeit'};
-  if(source.includes('appx') || source.includes('msix') || source.includes('choco')) return {level:'mittel', text:'Mittlere Verlässlichkeit'};
-  if(source.includes('pip') || source.includes('npm') || source.includes('service') || source.includes('driver')) return {level:'niedrig', text:'Technischer Kontext, fachlich prüfen'};
-  return {level:'unklar', text:'Quelle unbekannt'};
-}
-
-function softwareFullVersion(row){
-  const raw = String(row.Version || '').trim();
-  const matches = raw.match(/[0-9]+(?:\.[0-9A-Za-z-]+)+/g);
-  return matches && matches.length ? matches[matches.length - 1] : raw;
-}
-
-function softwareFamilyParts(row){
-  const name = String(row.DisplayName || row.Softwarename || row.Name || '').trim();
-  const source = String(row.Sources || row.Source || row.Quelle || row.PackageType || '').trim();
-  const version = softwareFullVersion(row);
-  const family = name
-    .replace(/\b\d+(?:\.\d+)+\b/g, '')
-    .replace(/\b(x64|x86|64-bit|32-bit|deutsch|german|english)\b/ig, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return {family: family || name, version, source};
-}
-
-function compactSoftwareFullRows(rows){
-  const groups = new Map();
-  rows.forEach(row=>{
-    const displayName = softwareFullDisplayName(row);
-    const version = softwareFullVersion(row);
-    const category = softwareFullCategory(row);
-    const key = softwareFullGroupKey(row, displayName, version, category);
-    if(!groups.has(key)){
-      groups.set(key, {...row, DisplayName:displayName, Version:version, EntryCount:1, SoftwareCategory:category, RawNames:[row.Name].filter(Boolean), ComponentDetails:[row]});
-      const created = groups.get(key);
-      created.UpdateStatus = created.UpdateStatus || "NoUpdateKnown";
-      created.UpdateAvailable = created.UpdateAvailable || "False";
-      created.InstalledVersion = created.InstalledVersion || version || "";
-      created.LatestVersion = created.LatestVersion || "";
-      created.UpdateSource = created.UpdateSource || "";
-      created.UpdateRaw = created.UpdateRaw || "";
-      created.UpdateCheckedAt = created.UpdateCheckedAt || "";
-      return;
-    }
-    const existing = groups.get(key);
-    existing.EntryCount += 1;
-    existing.ComponentDetails.push(row);
-    if(row.Name && !existing.RawNames.includes(row.Name)) existing.RawNames.push(row.Name);
-    existing.Sources = mergeCsvValues(existing.Sources || existing.Source || existing.Quelle, row.Sources || row.Source || row.Quelle);
-    existing.Quelle = existing.Sources;
-    existing.PackageType = mergeCsvValues(existing.PackageType || existing.Pakettyp, row.PackageType || row.Pakettyp);
-    existing.Pakettyp = existing.PackageType;
-    existing.Scope = mergeCsvValues(existing.Scope || existing.BenutzerKontext, row.Scope || row.BenutzerKontext);
-    existing.BenutzerKontext = existing.Scope;
-    if(!existing.Publisher && (row.Publisher || row.Hersteller)) existing.Publisher = row.Publisher || row.Hersteller;
-    if(!existing.Hersteller && (row.Hersteller || row.Publisher)) existing.Hersteller = row.Hersteller || row.Publisher;
-    if(!existing.InstallLocation && row.InstallLocation) existing.InstallLocation = row.InstallLocation;
-    if(!existing.RawPath && row.RawPath) existing.RawPath = row.RawPath;
-    if(!existing.RawSourceKey && row.RawSourceKey) existing.RawSourceKey = row.RawSourceKey;
-    existing.Version = mergeVersionValues(existing.Version, version);
-    if(String(row.UpdateAvailable || '').toLowerCase() === 'true'){
-      existing.UpdateStatus = row.UpdateStatus || 'UpdateAvailable';
-      existing.UpdateAvailable = row.UpdateAvailable;
-      existing.InstalledVersion = row.InstalledVersion || row.Version || existing.InstalledVersion;
-      existing.LatestVersion = row.LatestVersion || existing.LatestVersion;
-      existing.UpdateSource = mergeCsvValues(existing.UpdateSource, row.UpdateSource);
-      existing.UpdateRaw = row.UpdateRaw || existing.UpdateRaw;
-      existing.UpdateCheckedAt = row.UpdateCheckedAt || existing.UpdateCheckedAt;
-    }else{
-      existing.UpdateStatus = existing.UpdateStatus || row.UpdateStatus || 'NoUpdateKnown';
-      existing.UpdateAvailable = existing.UpdateAvailable || row.UpdateAvailable || 'False';
-      existing.InstalledVersion = existing.InstalledVersion || row.InstalledVersion || version || '';
-      existing.LatestVersion = existing.LatestVersion || row.LatestVersion || '';
-      existing.UpdateSource = existing.UpdateSource || row.UpdateSource || '';
-      existing.UpdateCheckedAt = existing.UpdateCheckedAt || row.UpdateCheckedAt || '';
-    }
-    existing.SoftwareCategory = existing.SoftwareCategory || category;
-  });
-  return Array.from(groups.values()).sort((a,b)=>softwareFullDisplayName(a).localeCompare(softwareFullDisplayName(b), 'de'));
-}
-
-function softwareFullGroupKey(row, displayName, version, category){
-  const nameKey = displayName.toLowerCase();
-  const family = softwareFullFamily(row);
-  if(family) return `${category}|family|${family.family.toLowerCase()}`;
-  if(SOFTWARE_FULL_SCOPE === 'apps' && category === 'app') return `app|${nameKey}`;
-  if(/^(Adobe Acrobat|Microsoft Visual C\+\+ Redistributable|Microsoft Edge WebView2|\.NET Runtime|Windows App Runtime|Microsoft VCLibs|Sophos Endpoint Security|Brother Drucker\/Scanner Suite)$/i.test(displayName)) return `${category}|${nameKey}`;
-  return `${category}|${nameKey}|${version.toLowerCase()}`;
-}
-
-function mergeVersionValues(a,b){
-  const values = new Set();
-  String(a || '').split(/\s*,\s*/).forEach(v=>{ if(v) values.add(v); });
-  String(b || '').split(/\s*,\s*/).forEach(v=>{ if(v) values.add(v); });
-  const list = Array.from(values).filter(Boolean).sort();
-  if(list.length > 4) return `${list[0]} ... ${list[list.length - 1]} (${list.length} Versionen)`;
-  return list.join(', ');
-}
-
-function mergeCsvValues(a,b){
-  const parts = new Set();
-  String(a || '').split(/\s*,\s*/).forEach(v=>{ if(v) parts.add(v); });
-  String(b || '').split(/\s*,\s*/).forEach(v=>{ if(v) parts.add(v); });
-  return Array.from(parts).sort().join(', ');
-}
-
-function softwareFullAsset(row){
-  const full = DB.softwareFull || {};
-  const assetId = row?.['Asset-ID'] || full.asset?.['Asset-ID'] || '';
-  const host = row?.['Gerätename'] || full.asset?.['Gerätename'] || '';
-  return (DB.assets || []).find(a =>
-    (assetId && a['Asset-ID'] === assetId) ||
-    (host && String(a['Gerätename']).toLowerCase() === String(host).toLowerCase())
-  ) || null;
-}
-
-function softwareStatusClass(row){
-  const lic = String(row['Lizenzstatus']||'').toLowerCase();
-  const upd = String(row['Update-Status']||'').toLowerCase();
-  const crit = String(row['Kritikalität']||'').toLowerCase();
-  if(lic.includes('abgelaufen') || upd.includes('veraltet') || crit.includes('hoch')) return 'danger';
-  if(lic.includes('prüfen') || upd.includes('prüfen') || crit.includes('mittel')) return 'warning';
-  return 'success';
-}
-
-function softwareStatusLabel(row){
-  const cls = softwareStatusClass(row);
-  if(cls === 'danger') return 'Prüfen';
-  if(cls === 'warning') return 'Hinweis';
-  return 'OK';
-}
-
-function softwareIcon(row){
-  const name = String(row['Softwarename']||'').toLowerCase();
-  if(name.includes('firefox') || name.includes('chrome') || name.includes('edge')) return '🌐';
-  if(name.includes('adobe') || name.includes('pdf')) return '📄';
-  if(name.includes('office') || name.includes('teams')) return '📦';
-  if(name.includes('visual c') || name.includes('.net') || name.includes('runtime')) return '🧩';
-  if(name.includes('vpn')) return '🔐';
-  if(name.includes('druck')) return '🖨️';
-  if(name.includes('bitlocker') || name.includes('update')) return '🛡️';
-  return '💜';
-}
-
-function renderSoftwareModern(){
-  const mod = modules.find(m=>m.key==='software');
-  const sourceRows = DB.software || [];
-  const rows = filterRows(sourceRows, 'software');
-  const idx = clamp(selectedIndex.software, rows.length);
-  selectedIndex.software = idx;
-  const row = rows[idx] || rows[0];
-
-  return `${contextHeader(mod)}
-    <div class="software-ui-toolbar card mb-3">
-      <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div>
-          <h4 class="mb-1">Software-Verwaltung</h4>
-          <div class="text-muted">Wizard-Style Karten, Status-Badges, Knowledge-Hinweise und Asset-Kontext.</div>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <div class="btn-group" role="group" aria-label="Softwareansicht">
-            <button class="btn btn-outline-secondary ${SOFTWARE_VIEW==='cards'?'active':''}" onclick="setSoftwareView('cards')">Standardkarten</button>
-            <button class="btn btn-outline-secondary ${SOFTWARE_VIEW==='table'?'active':''}" onclick="setSoftwareView('table')">Tabelle</button>
-            <button class="btn btn-outline-secondary ${SOFTWARE_VIEW==='full'?'active':''}" onclick="setSoftwareView('full')">Full-Scan</button>
-          </div>
-          <button class="btn btn-primary" onclick="openSoftwareProfileCreate()">+ Standardsoftware</button>
-          <button class="btn btn-outline-primary" onclick="openReferenceCreate('software')">+ Einzelsoftware</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-      ${softwareStatCard('Gesamt', rows.length, 'primary')}
-      ${softwareStatCard('OK', rows.filter(r=>softwareStatusClass(r)==='success').length, 'success')}
-      ${softwareStatCard('Hinweise', rows.filter(r=>softwareStatusClass(r)==='warning').length, 'warning')}
-      ${softwareStatCard('Prüfen', rows.filter(r=>softwareStatusClass(r)==='danger').length, 'danger')}
-    </div>
-
-    ${renderListControls('software', sourceRows)}
-    ${SOFTWARE_VIEW==='full' ? renderSoftwareFullInventory() : SOFTWARE_VIEW==='table' ? renderSplit('software',rows,moduleColumns('software'),row,renderModuleCard(mod,row,idx,rows.length)) : renderSoftwareCardsLayout(rows,row,idx,mod)}
-  `;
-}
-
-function renderSoftwareFullInventory(){
-  const full = DB.softwareFull || {};
-  const baseRows = softwareFullBaseRows();
-  const categoryCounts = softwareFullCategoryCounts(baseRows);
-  const classCounts = softwareFullClassCounts(baseRows);
-  const rows = softwareFullRows();
-  SOFTWARE_FULL_SELECTED = clamp(SOFTWARE_FULL_SELECTED, rows.length);
-  const row = rows[SOFTWARE_FULL_SELECTED] || rows[0];
-  const sources = full.sourcesStatus || {};
-  const okCount = Object.values(sources).filter(v=>String(v).startsWith('OK')).length;
-  const warnCount = Object.values(sources).filter(v=>String(v).startsWith('WARN')).length;
-  const skippedCount = Object.values(sources).filter(v=>String(v).startsWith('SKIPPED')).length;
-  if(!full.available){
-    return `<div class="card"><div class="card-body">
-      <h5>Full-Software-Scan</h5>
-      <p class="text-muted mb-3">Es wurde noch keine ` + '`software_full.json`' + ` geladen. Starte im Admin Panel den Full-Software-Scan und lade danach die Seite neu.</p>
-      <button class="btn btn-outline-primary" onclick="startScanner('software_full')">Full-Software-Scan starten</button>
-    </div></div>`;
-  }
-  return `<div class="row g-3">
-    <div class="col-12">
-      <div class="card software-full-summary">
-        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
-          <div>
-            <h5 class="mb-1">Full-Software-Inventar</h5>
-            <div class="text-muted">${safeEscape(full.asset?.['Gerätename'] || full.scannerContext?.CurrentUser || 'lokaler Scan')} · ${rows.length} angezeigte Einträge · ${categoryCounts.app} Anwendungen · ${categoryCounts.component} Komponenten · ${categoryCounts.system} System · ${classCounts.unclear || 0} unklare Funde</div>
-          </div>
-          <div class="software-source-pills">
-            ${softwareFullScopeButton('apps','Anwendungen',categoryCounts.app)}
-            ${softwareFullScopeButton('productivity','Produktiv',classCounts.productivity)}
-            ${softwareFullScopeButton('admin','Admin/IT',classCounts.admin)}
-            ${softwareFullScopeButton('development','Entwicklung',classCounts.development)}
-            ${softwareFullScopeButton('security','Security',classCounts.security)}
-            ${softwareFullScopeButton('drivers','Treiber',classCounts.driver)}
-            ${softwareFullScopeButton('runtimes','Runtimes',classCounts.runtime)}
-            ${softwareFullScopeButton('windows','Windows',classCounts.windows)}
-            ${softwareFullScopeButton('services','Dienste',classCounts.service)}
-            ${softwareFullScopeButton('unknown','Unklar',classCounts.unclear)}
-            ${softwareFullScopeButton('all','Alle',baseRows.length)}
-            <span class="badge text-bg-success">${okCount} OK</span>
-            <span class="badge text-bg-warning">${warnCount} Warnung</span>
-            <span class="badge text-bg-secondary">${skippedCount} übersprungen</span>
-            <span class="badge text-bg-primary">${safeEscape(full.scannerContext?.ScanMode || '-')}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-5">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Inventar-Karten</span>
-          <span class="badge text-bg-secondary">${rows.length}</span>
-        </div>
-        <div class="card-body software-card-list">
-          ${rows.length ? rows.map((r,i)=>renderSoftwareFullListCard(r,i)).join('') : '<div class="text-muted">Keine Full-Scan-Einträge passend zur Suche.</div>'}
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-7">
-      ${row ? renderSoftwareFullDetailCard(row, SOFTWARE_FULL_SELECTED, rows.length) : '<div class="card"><div class="card-body text-muted">Kein Eintrag ausgewählt.</div></div>'}
-    </div>
-  </div>`;
-}
-
-function softwareFullScopeButton(scope,label,count){
-  return `<button class="btn btn-sm btn-outline-secondary ${SOFTWARE_FULL_SCOPE===scope?'active':''}" onclick="setSoftwareFullScope('${scope}')">${label} <span class="badge text-bg-light">${count || 0}</span></button>`;
-}
-
-function renderSoftwareFullListCard(r,i){
-  const active = i === SOFTWARE_FULL_SELECTED ? 'active' : '';
-  const hasUpdate = String(r.UpdateAvailable || '').toLowerCase() === 'true';
-  const cls = hasUpdate ? 'danger' : String(r.ScanStatus || '').startsWith('OK') ? 'success' : 'warning';
-  const risk = softwareFullRisk(r);
-  const riskCls = risk === 'high' ? 'danger' : risk === 'medium' ? 'warning' : 'secondary';
-  return `<div class="software-list-card ${active}" onclick="setSoftwareFullSelected(${i})">
-    <div class="software-list-icon" title="${safeEscape(r.DisplayName || softwareFullDisplayName(r))}">${renderSoftwareFullLogo(r, 'list')}</div>
-    <div class="software-list-main">
-      <div class="software-list-title">${safeEscape(r.DisplayName || softwareFullDisplayName(r))}</div>
-      <div class="software-list-sub">${safeEscape(r.Publisher || r.Hersteller || '-')} · ${safeEscape(softwareFullVersion(r) || '-')}</div>
-      <div class="software-list-asset">${safeEscape(softwareFullClassLabel(r))} · ${safeEscape(r.PackageType || r.Pakettyp || '-')} · ${safeEscape(r.Sources || r.Source || '-')}</div>
-    </div>
-    <div class="d-flex flex-column align-items-end gap-1">
-      <span class="badge text-bg-${cls}">${hasUpdate ? 'Update' : r.EntryCount>1 ? safeEscape(r.EntryCount + ' Quellen') : safeEscape(r.DetectionConfidence || 'Scan')}</span>
-      <span class="badge text-bg-${riskCls}">${safeEscape(risk.toUpperCase())}</span>
-    </div>
-  </div>`;
-}
-
-function renderSoftwareFullDetailsMenu(row){
-  const details = Array.isArray(row.ComponentDetails) ? row.ComponentDetails : [];
-  if(details.length <= 1) return '';
-  return `<details class="software-full-details mt-3">
-    <summary>${details.length} zusammengeführte Einzelquellen anzeigen</summary>
-    <div class="table-wrap mt-2">
-      <table class="table table-sm">
-        <thead><tr><th>Name</th><th>Version</th><th>Typ</th><th>Quelle</th></tr></thead>
-        <tbody>
-          ${details.map(item=>`<tr>
-            <td>${safeEscape(item.DisplayName || item.Name || '-')}</td>
-            <td>${safeEscape(softwareFullVersion(item) || '-')}</td>
-            <td>${safeEscape(item.PackageType || item.Pakettyp || '-')}</td>
-            <td>${safeEscape(item.Sources || item.Source || item.Quelle || '-')}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-  </details>`;
-}
-
-function softwareFullIcon(row){
-  const type = String(row.PackageType || row.Pakettyp || '').toLowerCase();
-  const name = String(row.DisplayName || row.Name || '').toLowerCase();
-  if(type.includes('driver')) return '🛠️';
-  if(type.includes('service')) return '⚙️';
-  if(type.includes('appx')) return '▣';
-  if(type.includes('pip') || type.includes('npm')) return '{}';
-  if(name.includes('chrome') || name.includes('firefox') || name.includes('edge')) return '🌐';
-  return '◼';
-}
-
-function renderSoftwareFullDetailCard(row,idx,total){
-  const asset = softwareFullAsset(row);
-  const labels = softwareFullLabels(row);
-  const risk = softwareFullRisk(row);
-  const trust = softwareFullSourceTrust(row);
-  const family = softwareFamilyParts(row);
-  const riskCls = risk === 'high' ? 'danger' : risk === 'medium' ? 'warning' : 'secondary';
-  const updateCls = String(row.UpdateAvailable || '').toLowerCase() === 'true' ? 'danger' : 'secondary';
-  return `${navCustom(idx,total,'setSoftwareFullSelected')}
-    <div class="card software-detail-card mt-3">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-          <div>
-            <div class="software-detail-icon">${renderSoftwareFullLogo(row, 'detail')}</div>
-            <h3 class="mb-1">${safeEscape(row.DisplayName || softwareFullDisplayName(row))}</h3>
-            <span class="badge text-bg-primary">${safeEscape(row.PackageType || row.Pakettyp || 'Scan')}</span>
-            <span class="badge text-bg-secondary">${safeEscape(row.Scope || row.BenutzerKontext || '-')}</span>
-            <span class="badge text-bg-info">${safeEscape(softwareFullClassLabel(row))}</span>
-            <span class="badge text-bg-${riskCls}">Risiko: ${safeEscape(risk)}</span>
-            <span class="badge text-bg-${updateCls}">${safeEscape(row.UpdateStatus || 'Update unbekannt')}</span>
-            <span class="badge text-bg-dark">${safeEscape(softwareFullProfileStatus(row))}</span>
-            <span class="badge text-bg-success">zugeordnet zu: ${safeEscape(asset?.['Gerätename'] || row['Gerätename'] || row['Asset-ID'] || '-')}</span>
-          </div>
-          <button class="btn btn-outline-warning ${asset ? '' : 'd-none'}" onclick="createScannerReviewNote(${idx})">Nacharbeit notieren</button>
-        </div>
-        ${labels.length ? `<div class="mt-3 d-flex flex-wrap gap-1">${labels.map(label=>`<span class="badge text-bg-light">${safeEscape(label)}</span>`).join('')}</div>` : ''}
-        <div class="row mt-4">
-          <div class="col-md-6">
-            <h5>Software</h5>
-            <div class="kv">
-              ${kv('Anwendung',row.DisplayName || softwareFullDisplayName(row))}
-              ${kv('Produktfamilie',family.family)}
-              ${kv('Version',softwareFullVersion(row))}
-              ${kv('Hersteller',normalizeManufacturer(row.Publisher || row.Hersteller))}
-              ${kv('Klasse',softwareFullClassLabel(row))}
-              ${kv('Risiko/Relevanz',risk)}
-              ${kv('Quellenvertrauen',trust.level + ' - ' + trust.text)}
-              ${kv('Normalisierter Update-Status',normalizeUpdateStatus(row))}
-              ${kv('Profil-Abgleich',softwareFullProfileStatus(row))}
-              ${kv('Update-Auswertung',softwareFullUpdateAssessment(row))}
-              ${kv('Installierte Version',row.InstalledVersion || softwareFullVersion(row))}
-              ${kv('Neueste Version',row.LatestVersion || '-')}
-              ${kv('Update-Quelle',row.UpdateSource || '-')}
-              ${kv('Pakettyp',row.PackageType || row.Pakettyp)}
-              ${kv('Quelle',row.Sources || row.Source || row.Quelle)}
-              ${kv('Scope',row.Scope || row.BenutzerKontext)}
-              ${kv('Zusammengeführt',row.EntryCount > 1 ? row.EntryCount + ' Rohquellen' : 'Nein')}
-              ${kv('Confidence',row.DetectionConfidence)}
-              ${kv('Status',row.ScanStatus)}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <h5>Zugeordnetes Asset</h5>
-            <div class="kv">
-              ${kv('Asset-ID',asset?.['Asset-ID'] || row['Asset-ID'])}
-              ${kv('Gerätename',asset?.['Gerätename'] || row['Gerätename'])}
-              ${kv('Typ',asset?.['Asset-Typ'] || '-')}
-              ${kv('Standort',asset ? ((asset.Standort || '-') + ' / ' + (asset.Raum || '-')) : '-')}
-              ${kv('Nutzer',asset?.Hauptnutzer || '-')}
-              ${kv('Status',asset?.Status || '-')}
-            </div>
-          </div>
-        </div>
-        ${renderSoftwareFullAssetSummary(row)}
-        ${renderSoftwareFullDetailsMenu(row)}
-        <div class="software-raw-path mt-3">${safeEscape(row.InstallLocation || row.RawPath || row.RawSourceKey || '')}</div>
-      </div>
-    </div>`;
-}
-
-function renderSoftwareFullAssetSummary(row){
-  const asset = softwareFullAsset(row);
-  if(!asset) return '';
-  const allRows = compactSoftwareFullRows(softwareFullBaseRows().filter(r=>softwareFullAsset(r)?.['Asset-ID'] === asset['Asset-ID'] || softwareFullAsset(r)?.['Gerätename'] === asset['Gerätename']));
-  const counts = allRows.reduce((acc,item)=>{
-    const swClass = softwareFullClass(item);
-    acc[swClass] = (acc[swClass] || 0) + 1;
-    return acc;
-  }, {});
-  return `<div class="alert alert-light mt-3 mb-0">
-    <b>Asset-Softwareprofil:</b>
-    ${allRows.length} verdichtete Einträge,
-    ${(counts.productivity || 0)} Produktiv,
-    ${(counts.admin || 0)} Admin/IT,
-    ${(counts.development || 0)} Entwicklung,
-    ${(counts.security || 0)} Security,
-    ${(counts.unclear || 0)} unklar.
-  </div>`;
-}
-
-function softwareStatCard(title,value,color){
-  return `<div class="col-md-3">
-    <div class="card software-stat software-stat-${color}">
-      <div class="card-body">
-        <div class="software-stat-label">${title}</div>
-        <div class="software-stat-value">${value}</div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function renderSoftwareCardsLayout(rows,row,idx,mod){
-  return `<div class="row g-3">
-    <div class="col-lg-5">
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Software-Karten</span>
-          <span class="badge text-bg-secondary">${rows.length}</span>
-        </div>
-        <div class="card-body software-card-list">
-          ${rows.length ? rows.map((r,i)=>renderSoftwareListCard(r,i,idx)).join('') : '<div class="text-muted">Keine Software vorhanden.</div>'}
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-7">
-      ${row ? renderSoftwareDetailCard(row,idx,rows.length,mod) : '<div class="card"><div class="card-body text-muted">Kein Eintrag ausgewählt.</div></div>'}
-    </div>
-  </div>`;
-}
-
-function renderSoftwareListCard(r,i,idx){
-  const cls = softwareStatusClass(r);
-  return `<div class="software-list-card ${i===idx?'active':''}" onclick="selectedIndex.software=${i};render();">
-    <div class="software-list-icon">${softwareIcon(r)}</div>
-    <div class="software-list-main">
-      <div class="software-list-title">${safeEscape(r['Softwarename']||'Software')}</div>
-      <div class="software-list-sub">${safeEscape(r['Hersteller']||'-')} · ${safeEscape(r['Version']||'-')}</div>
-      <div class="software-list-asset">${safeEscape(r['Gerätename']||r['Asset-ID']||'-')}</div>
-    </div>
-    <span class="badge text-bg-${cls}">${softwareStatusLabel(r)}</span>
-  </div>`;
-}
-
-function renderSoftwareDetailCard(row,idx,total,mod){
-  const asset = CORE.findAsset(row['Asset-ID']);
-  const cls = softwareStatusClass(row);
-  const kbHint = softwareKnowledgeHint(row);
-  return `${nav('software',idx,total)}
-    <div class="card software-detail-card mt-3">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
-          <div>
-            <div class="software-detail-icon">${softwareIcon(row)}</div>
-            <h3 class="mb-1">${safeEscape(row['Softwarename']||'Software')}</h3>
-            <span class="badge text-bg-primary">Software</span>
-            <span class="badge text-bg-${cls}">${softwareStatusLabel(row)}</span>
-            <span class="badge text-bg-success">zugeordnet zu: ${safeEscape(row['Gerätename']||row['Asset-ID']||'-')}</span>
-          </div>
-          <div class="d-flex gap-2 ${canWrite() ? '' : 'd-none'}">
-            <button class="btn btn-outline-primary" onclick="openEdit('software',${idx})">Bearbeiten</button>
-            <button class="btn btn-outline-danger" onclick="deleteRow('software',${idx})">Löschen</button>
-          </div>
-        </div>
-        ${kbHint}
-        <div class="row mt-4">
-          <div class="col-md-6">
-            <h5>Software</h5>
-            <div class="kv">
-              ${kv('Software-ID',row['Software-ID'])}
-              ${kv('Anwendung',row['Softwarename'])}
-              ${kv('Version',row['Version'])}
-              ${kv('Hersteller',row['Hersteller'])}
-              ${kv('Lizenzstatus',row['Lizenzstatus'])}
-              ${kv('Update-Status',row['Update-Status'])}
-              ${kv('Kritikalität',row['Kritikalität'])}
-              ${kv('Bemerkung',row['Bemerkung'])}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <h5>Zugeordnetes Asset</h5>
-            <div class="kv">
-              ${kv('Asset-ID',row['Asset-ID'])}
-              ${kv('Gerätename',asset?.['Gerätename']||row['Gerätename']||'-')}
-              ${kv('Typ',asset?.['Asset-Typ']||'-')}
-              ${kv('Standort',asset?(asset.Standort+' / '+asset.Raum):'-')}
-              ${kv('Nutzer',asset?.Hauptnutzer||'-')}
-              ${kv('Status',asset?.Status||'-')}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-}
-
-function softwareKnowledgeHint(row){
-  const text = String((row['Softwarename']||'') + ' ' + (row['Bemerkung']||'')).toLowerCase();
-  if(text.includes('adobe') && (text.includes('zertifikat') || text.includes('signatur') || text.includes('fehlt'))){
-    const kb = findKnowledgeByTitle('Adobe Signatur-Zertifikat installieren');
-    if(kb){
-      return `<div class="alert alert-warning mt-3">⚠ Signatur/Zertifikat relevant · Knowledge vorhanden: <b>${kb['Knowledge-ID']}</b> – ${safeEscape(kb.Titel)}</div>`;
-    }
-    return `<div class="alert alert-warning mt-3">⚠ Signatur/Zertifikat relevant · <button class="btn btn-sm btn-outline-warning" onclick="createKnowledgeForSoftware('Adobe Signatur-Zertifikat installieren')">Knowledge erstellen</button></div>`;
-  }
-  return '';
-}
-
-function openSoftwareProfileCreate(){
-  if(!requireWriteAccess('Standardsoftware hinzufügen')) return;
-  const assets = DB.assets || [];
-  const html = `<div class="modal fade" id="softwareProfileModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title">Standardsoftware hinzufügen</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <label class="form-label">Asset</label>
-      <select id="profileAsset" class="form-select mb-3">
-        ${assets.map(a=>`<option value="${safeEscape(a['Asset-ID'])}">${safeEscape(a['Asset-ID'])} – ${safeEscape(a['Gerätename'])}</option>`).join('')}
-      </select>
-      <div class="alert alert-info">Wähle typische Software aus. Beim Speichern werden einzelne Software-Einträge erzeugt.</div>
-      <div class="software-smart-grid">
-        ${SMART_SOFTWARE_PROFILES.windows.map(item=>`<label class="software-smart-card">
-          <input type="checkbox" class="profileSoft" value="${safeEscape(item.key)}" data-name="${safeEscape(item.software)}" data-vendor="${safeEscape(item.vendor)}">
-          <b>${softwareGroupIcon(item.group)} ${safeEscape(item.label)}</b><br>
-          <span class="software-meta">${safeEscape(item.vendor)} · ${safeEscape(item.software)}</span>
-        </label>`).join('')}
-      </div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button><button class="btn btn-primary" onclick="saveSoftwareProfile()">Speichern</button></div>
-  </div></div></div>`;
-  document.getElementById('dynamicModalHost')?.remove();
-  const host=document.createElement('div');host.id='dynamicModalHost';host.innerHTML=html;document.body.appendChild(host);
-  new bootstrap.Modal(document.getElementById('softwareProfileModal')).show();
-}
-
-function saveSoftwareProfile(){
-  if(!requireWriteAccess('Standardsoftware speichern')) return;
-  const assetId = document.getElementById('profileAsset').value;
-  const asset = CORE.findAsset(assetId);
-  document.querySelectorAll('.profileSoft:checked').forEach(el=>{
-    DB.software.push({
-      'Software-ID': nextId('software','Software-ID',ID_PREFIXES.software),
-      'Asset-ID': assetId,
-      'Gerätename': asset?.['Gerätename'] || '',
-      'Softwarename': el.dataset.name || el.value,
-      'Version': '',
-      'Hersteller': el.dataset.vendor || '',
-      'Lizenzstatus': 'Aktiv',
-      'Update-Status': 'Prüfen',
-      'Kritikalität': ['vcRuntime','dotnetRuntime','vpnClient','bitlocker'].includes(el.value) ? 'Hoch' : 'Normal',
-      'Bemerkung': 'Aus Standardsoftware-Profil erstellt.'
-    });
-  });
-  persist();
-  if(typeof maybeSaveDbToServer === 'function') maybeSaveDbToServer(); else saveDbToServer();
-  bootstrap.Modal.getInstance(document.getElementById('softwareProfileModal')).hide();
-  activeKey='software';
-  renderAll();
-  toast('Standardsoftware hinzugefügt.');
-}
-
-function renderLinkedModule(mod){if(mod.key==='software')return renderSoftwareModern();const sourceRows=DB[mod.key]||[];const rows=filterRows(sourceRows,mod.key);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return contextHeader(mod)+renderListControls(mod.key,sourceRows)+toolbar(mod,row,idx)+renderSplit(mod.key,rows,moduleColumns(mod.key),row,renderModuleCard(mod,row,idx,rows.length));}
-function renderSimpleModule(mod){const sourceRows=DB[mod.key]||[];const rows=filterRows(sourceRows,mod.key);const idx=clamp(selectedIndex[mod.key],rows.length);selectedIndex[mod.key]=idx;const row=rows[idx]||null;return renderListControls(mod.key,sourceRows)+toolbar(mod,row,idx)+renderSplit(mod.key,rows,moduleColumns(mod.key),row,renderGenericCard(mod,row,idx,rows.length));}
-function renderSplit(key,rows,cols,row,cardHtml){
-  const empty = rows.length === 0
-    ? `<tr><td colspan="${Math.max(cols.length,1)}">${emptyStateFor(key)}</td></tr>`
-    : '';
-  return `<div class="split"><div><div class="card"><div class="card-header">Liste</div><div class="card-body"><div class="table-wrap"><table class="table table-sm table-hover data-table"><thead><tr>${cols.map(c=>`<th>${safeEscape(c)}</th>`).join('')}</tr></thead><tbody>${empty || renderGroupedRows(key, rows, cols)}</tbody></table></div></div></div></div><div>${cardHtml}</div></div>`;
-}
-function renderGroupedRows(key, rows, cols){
-  const group = listState(key).group;
-  let last = null;
-  return rows.map((r,i)=>{
-    const current = group && group !== 'none' ? groupValue(key, r, group) : null;
-    const header = current && current !== last ? `<tr class="table-group-row"><td colspan="${Math.max(cols.length,1)}">${safeEscape(current)}</td></tr>` : '';
-    last = current || last;
-    return header + `<tr class="${i===selectedIndex[key]?'active':''}" onclick="selectRow('${key}',${i})">${cols.map(c=>`<td>${formatCell(r,c)}</td>`).join('')}</tr>`;
-  }).join('');
-}
-function groupValue(key,row,group){
-  if(group === 'family') return softwareFamilyParts(row).family || 'Ohne Produktfamilie';
-  return row[group] || 'Ohne Wert';
-}
 function formatCell(row,key){
   const text = val(row,key);
   if(!searchText.trim()) return safeEscape(text);
@@ -1660,7 +839,9 @@ function formatCell(row,key){
   const q = safeEscape(searchText.trim()).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return escaped.replace(new RegExp(q, 'ig'), match => `<mark>${match}</mark>`);
 }
-function selectRow(key,idx){selectedIndex[key]=idx;render();} function prevRow(key){selectedIndex[key]--;render();} function nextRow(key){selectedIndex[key]++;render();}
+function selectRow(key,idx){selectedIndex[key]=idx;render();}
+function prevRow(key){if(typeof selectedIndex[key] !== 'number') return; selectedIndex[key]--;render();}
+function nextRow(key){if(typeof selectedIndex[key] !== 'number') return; selectedIndex[key]++;render();}
 function nav(key,idx,total){return `<div class="card"><div class="card-body d-flex justify-content-between align-items-center"><button class="btn btn-outline-primary" onclick="prevRow('${key}')">←</button><b>${total?idx+1:0} / ${total}</b><button class="btn btn-outline-primary" onclick="nextRow('${key}')">→</button></div></div>`;}
 function navCustom(idx,total,setter){return `<div class="card"><div class="card-body d-flex justify-content-between align-items-center"><button class="btn btn-outline-primary" onclick="${setter}(${Math.max(0,idx-1)})">←</button><b>${total?idx+1:0} / ${total}</b><button class="btn btn-outline-primary" onclick="${setter}(${total?Math.min(total-1,idx+1):0})">→</button></div></div>`;}
 function assetColumns(){return ['Asset-ID','Gerätename','Asset-Typ','Standort','Status','Hauptnutzer','Inventarnummer'];}
@@ -1796,485 +977,6 @@ function renderGenericCard(mod,r,idx,total){
   return `${nav(mod.key,idx,total)}<div class="card mt-3 card-context-${mod.context||'default'}"><div class="card-body"><div class="detail-title">${safeEscape(r[mod.id]||mod.title)}</div><div class="kv mt-3">${main}</div></div></div>`;
 }
 
-function renderKnowledgeCard(mod,r,idx,total){
-  const commandHtml = renderKnowledgeCommands(r);
-  return `${nav(mod.key,idx,total)}
-    <div class="card mt-3 knowledge-card">
-      <div class="card-body">
-        <div class="detail-title">${safeEscape(r['Knowledge-ID'] || 'Knowledge')}</div>
-        <div class="kv mt-3">
-          ${kv('Knowledge-ID', r['Knowledge-ID'])}
-          ${kv('Titel', r.Titel)}
-          ${kv('Kategorie', r.Kategorie)}
-          ${kv('Tags', r.Tags)}
-        </div>
-        ${renderKnowledgeSolution(r['Lösung'])}
-        ${commandHtml}
-      </div>
-    </div>`;
-}
-
-function renderKnowledgeSolution(value){
-  const sections = splitKnowledgeSections(value);
-  if(!sections.length) return '<div class="text-muted mt-3">Keine Lösung dokumentiert.</div>';
-  const problem = sections.filter(s => /problem|symptom|fehler|störung|stoerung/i.test(s.title));
-  const rest = sections.filter(s => !problem.includes(s));
-  return `<div class="knowledge-solution mt-4">
-    ${problem.length ? `<div class="knowledge-problem">
-      <div class="knowledge-section-title">Zu behebendes Problem</div>
-      ${problem.map(renderKnowledgeSectionBody).join('')}
-    </div>` : ''}
-    ${rest.map(section => `<section class="knowledge-section">
-      <div class="knowledge-section-title">${safeEscape(section.title)}</div>
-      ${renderKnowledgeSectionBody(section)}
-    </section>`).join('')}
-  </div>`;
-}
-
-function splitKnowledgeSections(value){
-  const text = htmlToPlainText(value);
-  const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-  const sections = [];
-  let current = {title:'Zusammenfassung', body:[]};
-  lines.forEach(line => {
-    const heading = line.match(/^##\s*(.+)$/);
-    if(heading){
-      if(current.body.length) sections.push(current);
-      current = {title:heading[1].trim(), body:[]};
-    }else{
-      current.body.push(line);
-    }
-  });
-  if(current.body.length) sections.push(current);
-  return sections.length ? sections : [{title:'Lösung', body:[text]}];
-}
-
-function renderKnowledgeSectionBody(section){
-  const items = section.body.filter(line => line.startsWith('- ')).map(line => line.slice(2));
-  const paragraphs = section.body.filter(line => !line.startsWith('- '));
-  return `${paragraphs.map(line => `<p>${safeEscape(line)}</p>`).join('')}
-    ${items.length ? `<ul>${items.map(item => `<li>${safeEscape(item)}</li>`).join('')}</ul>` : ''}`;
-}
-
-function renderKnowledgeCommands(row){
-  const commands = knowledgeCommandSuggestions(row);
-  if(!commands.length) return '';
-  const topic = knowledgeCommandTopic(row);
-  return `<div class="knowledge-commands mt-4">
-    <div class="knowledge-section-title">Nützliche Befehle zur Prüfung <span class="badge text-bg-secondary">${safeEscape(topic.label)}</span></div>
-    <div class="alert alert-warning py-2">Befehle zuerst prüfen. Manche Abfragen benötigen PowerShell als Administrator.</div>
-    ${commands.map(renderKnowledgeCommand).join('')}
-  </div>`;
-}
-
-function renderKnowledgeCommand(item){
-  const encoded = encodeURIComponent(item.command);
-  return `<div class="knowledge-command">
-    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-      <div>
-        <b>${safeEscape(item.title)}</b>
-        <div class="text-muted small">${safeEscape(item.shell)} · ${safeEscape(item.note || '')}</div>
-      </div>
-      <button class="btn btn-sm btn-outline-primary" onclick="copyCommand(decodeURIComponent('${encoded}'))">Kopieren</button>
-    </div>
-    <pre><code>${safeEscape(item.command)}</code></pre>
-  </div>`;
-}
-
-function knowledgeCommandSuggestions(row){
-  const profile = knowledgeCommandProfile(row);
-  return profile ? profile.commands : [];
-}
-
-function knowledgeCommandTopic(row){
-  const profile = knowledgeCommandProfile(row);
-  return profile ? {kind:profile.kind, label:profile.label} : {kind:'none', label:'Keine Befehle'};
-}
-
-function normalizeKnowledgeTitle(row){
-  return String(row.Titel || '')
-    .replace(/^AS-\d+\s*-\s*/i, '')
-    .replace(/\s*\(Variante\s*\d+\)\s*$/i, '')
-    .trim()
-    .toLowerCase();
-}
-
-function knowledgeCommandProfile(row){
-  const title = normalizeKnowledgeTitle(row);
-  return knowledgeCommandProfiles().find(profile => profile.match.test(title)) || null;
-}
-
-function command(title, shell, commandText, note=''){
-  return {title, shell, command:commandText, note};
-}
-
-function knowledgeCommandProfiles(){
-  return [
-    {
-      match:/^lan-verbindung fehlt$/,
-      kind:'network',
-      label:'Netzwerk/LAN',
-      commands:[
-        command('IP-Konfiguration vollständig anzeigen','CMD','ipconfig /all','Adapter, DHCP, DNS und Gateway prüfen.'),
-        command('Aktive Netzwerkadapter anzeigen','PowerShell','Get-NetAdapter | Sort-Object Status, Name | Format-Table Name, Status, LinkSpeed, MacAddress -AutoSize','Linkstatus und MAC vergleichen.'),
-        command('IP-Konfiguration strukturiert prüfen','PowerShell','Get-NetIPConfiguration','IP, DNS und Gateway je Adapter.'),
-        command('Gateway erreichbar prüfen','PowerShell','Test-NetConnection -ComputerName 10.81.20.1','Gateway-IP bei Bedarf ersetzen.')
-      ]
-    },
-    {
-      match:/bios\/uefi-grundkonfiguration prüfen/,
-      kind:'hardware',
-      label:'Hardware/BIOS',
-      commands:[
-        command('BIOS-Version und Seriennummer prüfen','PowerShell','Get-CimInstance Win32_BIOS | Select-Object SMBIOSBIOSVersion, Manufacturer, ReleaseDate, SerialNumber','BIOS-Stand dokumentieren.'),
-        command('Firmware-/BIOS-Eigenschaften anzeigen','PowerShell','Get-ComputerInfo -Property "*bios*","*firmware*"','Windows PowerShell 5.1+.'),
-        command('Secure-Boot Status prüfen','PowerShell','Confirm-SecureBootUEFI','Nur UEFI-Systeme, ggf. Adminrechte.'),
-        command('Boot-Konfiguration anzeigen','CMD','bcdedit /enum','Nur anzeigen, nicht ändern.')
-      ]
-    },
-    {
-      match:/tpm-status unter windows 11 prüfen/,
-      kind:'security',
-      label:'TPM/BitLocker',
-      commands:[
-        command('TPM Status prüfen','PowerShell','Get-Tpm','TPM bereit, aktiviert und initialisiert?'),
-        command('BitLocker Volume-Status prüfen','PowerShell','Get-BitLockerVolume C: | Format-List','Schutzstatus und Verschlüsselung prüfen.'),
-        command('BitLocker Status per CMD prüfen','CMD','manage-bde -status C:','CMD-kompatible Gegenprüfung.'),
-        command('TPM-Ereignisse prüfen','PowerShell','Get-WinEvent -LogName System -MaxEvents 80 | Where-Object ProviderName -match "TPM|TBS" | Select-Object TimeCreated, ProviderName, LevelDisplayName, Message','Nur relevante Systemereignisse.')
-      ]
-    },
-    {
-      match:/secure boot kontrollieren/,
-      kind:'security',
-      label:'Secure Boot',
-      commands:[
-        command('Secure-Boot Status prüfen','PowerShell','Confirm-SecureBootUEFI','Kernabfrage für Secure Boot.'),
-        command('Firmwaretyp anzeigen','PowerShell','Get-ComputerInfo -Property BiosFirmwareType, BiosSMBIOSBIOSVersion','UEFI/BIOS-Kontext prüfen.'),
-        command('Boot-Konfiguration anzeigen','CMD','bcdedit /enum','Bootpfad und Bootmanager nur lesen.'),
-        command('BitLocker Status prüfen','PowerShell','Get-BitLockerVolume C: | Select-Object MountPoint, ProtectionStatus, VolumeStatus','Vor BIOS-Änderungen wichtig.')
-      ]
-    },
-    {
-      match:/intel i5-6600 leistungsengpässe analysieren/,
-      kind:'hardware',
-      label:'CPU/Performance',
-      commands:[
-        command('CPU-Modell und Kerne anzeigen','PowerShell','Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed','Hardwaredaten gegen Inventar prüfen.'),
-        command('Aktuelle CPU-Last messen','PowerShell','Get-Counter "\\Processor(_Total)\\% Processor Time"','Momentaufnahme der CPU-Auslastung.'),
-        command('CPU-lastige Prozesse anzeigen','PowerShell','Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Name, Id, CPU, WorkingSet','Auffällige Prozesse erkennen.'),
-        command('Energieplan anzeigen','CMD','powercfg /getactivescheme','Leistungsprofil prüfen.')
-      ]
-    },
-    {
-      match:/ram-auslastung mit 32 gb prüfen/,
-      kind:'hardware',
-      label:'RAM',
-      commands:[
-        command('Installierten und freien RAM anzeigen','PowerShell','Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize, FreePhysicalMemory','Werte in KB.'),
-        command('RAM-Riegel anzeigen','PowerShell','Get-CimInstance Win32_PhysicalMemory | Select-Object BankLabel, Capacity, Speed, Manufacturer, PartNumber','Bestückung prüfen.'),
-        command('Speicherintensive Prozesse anzeigen','PowerShell','Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 15 Name, Id, WorkingSet','WorkingSet zeigt aktuelle Speichernutzung.'),
-        command('Verfügbaren Speicher messen','PowerShell','Get-Counter "\\Memory\\Available MBytes"','Kurze Live-Abfrage.')
-      ]
-    },
-    {
-      match:/ssd- und smart-werte bewerten/,
-      kind:'hardware',
-      label:'SSD/SMART',
-      commands:[
-        command('Physische Datenträger anzeigen','PowerShell','Get-PhysicalDisk | Select-Object FriendlyName, MediaType, HealthStatus, OperationalStatus, Size','Gesundheitsstatus prüfen.'),
-        command('SMART-/Reliability-Werte anzeigen','PowerShell','Get-PhysicalDisk | Get-StorageReliabilityCounter | Format-List','Temperatur, Fehler, Wear soweit verfügbar.'),
-        command('Volumes anzeigen','PowerShell','Get-Volume | Select-Object DriveLetter, FileSystemLabel, HealthStatus, SizeRemaining, Size','Freier Speicher und Volume-Status.'),
-        command('Datenträgerdetails anzeigen','PowerShell','Get-Disk | Select-Object Number, FriendlyName, HealthStatus, OperationalStatus, PartitionStyle, Size','Datenträgerstatus strukturiert.')
-      ]
-    },
-    {
-      match:/fujitsu p24-8 we über displayport prüfen/,
-      kind:'hardware',
-      label:'Monitor/DisplayPort',
-      commands:[
-        command('Grafikadapter anzeigen','PowerShell','Get-CimInstance Win32_VideoController | Select-Object Name, DriverVersion, VideoModeDescription','Treiber und Auflösung prüfen.'),
-        command('Monitor-PnP-Geräte anzeigen','PowerShell','Get-PnpDevice -Class Monitor | Format-Table Status, FriendlyName, InstanceId -AutoSize','Erkannten Monitor prüfen.'),
-        command('Display-Diagnose exportieren','CMD','dxdiag /t "%TEMP%\\dxdiag.txt"','Erzeugt Textbericht im TEMP-Ordner.'),
-        command('Display-relevante Fehler suchen','PowerShell','Get-WinEvent -LogName System -MaxEvents 80 | Where-Object Message -match "display|monitor|graphics|igfx|driver" | Select-Object TimeCreated, ProviderName, Message','Treiber-/Display-Hinweise.')
-      ]
-    },
-    {
-      match:/cmos-batterie und uhrzeit prüfen/,
-      kind:'hardware',
-      label:'CMOS/Zeit',
-      commands:[
-        command('Windows-Zeitstatus anzeigen','CMD','w32tm /query /status','Zeitquelle und Offset prüfen.'),
-        command('Aktuelle Systemzeit anzeigen','PowerShell','Get-Date','Schnelle Sichtprüfung.'),
-        command('BIOS-Datum und Version anzeigen','PowerShell','Get-CimInstance Win32_BIOS | Select-Object SMBIOSBIOSVersion, ReleaseDate, SerialNumber','BIOS-Kontext prüfen.'),
-        command('Zeitsynchronisation testen','CMD','w32tm /resync /dryrun','Simulation ohne Änderung.')
-      ]
-    },
-    {
-      match:/usb-geräte und sicherheitsrichtlinien prüfen/,
-      kind:'security',
-      label:'USB/Richtlinien',
-      commands:[
-        command('USB-Geräte anzeigen','PowerShell','Get-PnpDevice -Class USB | Sort-Object Status, FriendlyName | Format-Table Status, FriendlyName, InstanceId -AutoSize','USB-Erkennung prüfen.'),
-        command('USBSTOR-Dienststatus prüfen','PowerShell','Get-ItemProperty HKLM:\\SYSTEM\\CurrentControlSet\\Services\\USBSTOR | Select-Object Start','Start=4 bedeutet typischerweise deaktiviert.'),
-        command('Wechseldatenträger-Richtlinien prüfen','PowerShell','Get-ItemProperty -Path HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\RemovableStorageDevices -ErrorAction SilentlyContinue','GPO-basierte Sperren prüfen.'),
-        command('Gruppenrichtlinien anzeigen','CMD','gpresult /scope computer /r','Computer-Richtlinien kurz anzeigen.')
-      ]
-    },
-    {
-      match:/geräuschentwicklung und lüfter prüfen/,
-      kind:'hardware',
-      label:'Lüfter/Last',
-      commands:[
-        command('CPU-lastige Prozesse anzeigen','PowerShell','Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Name, Id, CPU, WorkingSet','Hohe Last als Geräuschursache.'),
-        command('CPU und BIOS anzeigen','PowerShell','Get-CimInstance Win32_Processor | Select-Object Name, CurrentClockSpeed, MaxClockSpeed','Takt-/CPU-Kontext prüfen.'),
-        command('Temperatursensoren abfragen','PowerShell','Get-CimInstance MSAcpi_ThermalZoneTemperature -Namespace root/wmi -ErrorAction SilentlyContinue','Nicht jedes Gerät liefert Werte.'),
-        command('Energieplan anzeigen','CMD','powercfg /getactivescheme','Leistungsprofil dokumentieren.')
-      ]
-    },
-    {
-      match:/dhcp-lease erneuern/,
-      kind:'network',
-      label:'DHCP',
-      commands:[
-        command('Aktuelle DHCP-Konfiguration anzeigen','CMD','ipconfig /all','Vor Änderung dokumentieren.'),
-        command('DHCP-Lease freigeben','CMD','ipconfig /release','Ändert die Verbindung. Nur bewusst ausführen.'),
-        command('DHCP-Lease erneuern','CMD','ipconfig /renew','Ändert die Verbindung.'),
-        command('IP-Konfiguration danach prüfen','PowerShell','Get-NetIPConfiguration','Nachkontrolle.')
-      ]
-    },
-    {
-      match:/dns-auflösung reparieren/,
-      kind:'network',
-      label:'DNS',
-      commands:[
-        command('DNS-Server anzeigen','PowerShell','Get-DnsClientServerAddress','Konfigurierte DNS-Server prüfen.'),
-        command('DNS-Auflösung testen','PowerShell','Resolve-DnsName www.eah-jena.de','Ziel bei Bedarf ersetzen.'),
-        command('DNS per nslookup testen','CMD','nslookup www.eah-jena.de','CMD-Gegenprüfung.'),
-        command('DNS-Cache anzeigen','CMD','ipconfig /displaydns','Cache prüfen.'),
-        command('DNS-Cache leeren','CMD','ipconfig /flushdns','Ändert nur lokalen Cache.')
-      ]
-    },
-    {
-      match:/lan\/wlan-konflikt beseitigen/,
-      kind:'network',
-      label:'LAN/WLAN',
-      commands:[
-        command('Adapterstatus anzeigen','PowerShell','Get-NetAdapter | Sort-Object Status, Name | Format-Table Name, Status, InterfaceDescription, LinkSpeed, MacAddress -AutoSize','LAN/WLAN parallel prüfen.'),
-        command('Alle IP-Konfigurationen anzeigen','PowerShell','Get-NetIPConfiguration -All','Auch getrennte/virtuelle Adapter sichtbar.'),
-        command('Routingtabelle anzeigen','CMD','route print','Standardroute und Metriken prüfen.'),
-        command('Netzwerkprofile anzeigen','PowerShell','Get-NetConnectionProfile','Profil je Adapter prüfen.')
-      ]
-    },
-    {
-      match:/switch-port und wanddose nachtragen/,
-      kind:'network',
-      label:'Switch/Wanddose',
-      commands:[
-        command('MAC-Adresse und Linkstatus anzeigen','PowerShell','Get-NetAdapter | Select-Object Name, Status, LinkSpeed, MacAddress','MAC für Switchsuche dokumentieren.'),
-        command('Nachbarn im Netz anzeigen','PowerShell','Get-NetNeighbor | Sort-Object State, IPAddress | Select-Object IPAddress, LinkLayerAddress, State','ARP/Neighbor-Tabelle prüfen.'),
-        command('IP-Konfiguration dokumentieren','CMD','ipconfig /all','Adapterbeschreibung, DHCP und DNS.'),
-        command('Gateway erreichen','PowerShell','Test-NetConnection -ComputerName 10.81.20.1','Gateway-IP ersetzen.')
-      ]
-    },
-    {
-      match:/paketverlust und latenz prüfen/,
-      kind:'network',
-      label:'Latenz/Paketverlust',
-      commands:[
-        command('Ping mit mehreren Versuchen','PowerShell','Test-Connection -ComputerName 10.81.20.1 -Count 20','Gateway/Ziel ersetzen.'),
-        command('TCP-Erreichbarkeit testen','PowerShell','Test-NetConnection -ComputerName www.eah-jena.de -Port 443','DNS und HTTPS-Erreichbarkeit.'),
-        command('Pfad mit Paketverlust prüfen','CMD','pathping www.eah-jena.de','Dauert einige Minuten.'),
-        command('Route verfolgen','CMD','tracert www.eah-jena.de','Pfad sichtbar machen.')
-      ]
-    },
-    {
-      match:/windows update hängt/,
-      kind:'windows',
-      label:'Windows Update',
-      commands:[
-        command('Windows-Update Dienste prüfen','PowerShell','Get-Service wuauserv,bits,cryptsvc | Select-Object Name, Status, StartType','Basisdienste prüfen.'),
-        command('Letzte Windows-Update Ereignisse','PowerShell','Get-WinEvent -ProviderName Microsoft-Windows-WindowsUpdateClient -MaxEvents 50 | Select-Object TimeCreated, Id, LevelDisplayName, Message','UpdateClient-Ereignisse.'),
-        command('Installierte Hotfixes anzeigen','PowerShell','Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 20','Installationshistorie.'),
-        command('Windows Update Log erzeugen','PowerShell','Get-WindowsUpdateLog','Erzeugt WindowsUpdate.log auf dem Desktop.')
-      ]
-    },
-    {
-      match:/defender-status prüfen/,
-      kind:'security',
-      label:'Defender',
-      commands:[
-        command('Defender Status anzeigen','PowerShell','Get-MpComputerStatus','Status und Signaturen prüfen.'),
-        command('Defender Signaturen aktualisieren','PowerShell','Update-MpSignature','Ändert Signaturen, Internet nötig.'),
-        command('Schnellscan starten','PowerShell','Start-MpScan -ScanType QuickScan','Aktive Prüfung, kann dauern.'),
-        command('Defender Ereignisse anzeigen','PowerShell','Get-WinEvent -LogName "Microsoft-Windows-Windows Defender/Operational" -MaxEvents 50 | Select-Object TimeCreated, Id, Message','Defender Operational Log.')
-      ]
-    },
-    {
-      match:/bitlocker-recovery vermeiden/,
-      kind:'security',
-      label:'BitLocker',
-      commands:[
-        command('BitLocker Status prüfen','PowerShell','Get-BitLockerVolume C: | Format-List','Schutzstatus vor Änderungen.'),
-        command('Protektoren anzeigen','PowerShell','(Get-BitLockerVolume -MountPoint C:).KeyProtector','Recovery-/TPM-Protektoren prüfen.'),
-        command('BitLocker Status per CMD','CMD','manage-bde -status C:','CMD-Gegenprüfung.'),
-        command('Schutz temporär aussetzen','PowerShell','Suspend-BitLocker -MountPoint C: -RebootCount 1','Ändert Schutzstatus. Nur vor BIOS/Firmware-Änderung bewusst nutzen.')
-      ]
-    },
-    {
-      match:/benutzerprofil reparieren/,
-      kind:'windows',
-      label:'Benutzerprofil',
-      commands:[
-        command('Aktuellen Benutzer anzeigen','CMD','whoami /user','SID dokumentieren.'),
-        command('Lokale Benutzerprofile anzeigen','PowerShell','Get-CimInstance Win32_UserProfile | Select-Object LocalPath, SID, Loaded, LastUseTime','Profilzustand prüfen.'),
-        command('Angemeldete Sitzungen anzeigen','CMD','query user','Sitzungen prüfen.'),
-        command('Profilordner anzeigen','PowerShell','Get-ChildItem C:\\Users | Select-Object Name, LastWriteTime','Profilordner prüfen.')
-      ]
-    },
-    {
-      match:/gruppenrichtlinien prüfen/,
-      kind:'windows',
-      label:'Gruppenrichtlinien',
-      commands:[
-        command('RSoP Kurzbericht Computer','CMD','gpresult /scope computer /r','Computer-Richtlinien.'),
-        command('RSoP Kurzbericht Benutzer','CMD','gpresult /scope user /r','Benutzer-Richtlinien.'),
-        command('HTML-Bericht erzeugen','CMD','gpresult /h "%TEMP%\\gpresult.html" /f','Erzeugt Bericht im TEMP-Ordner.'),
-        command('Gruppenrichtlinien aktualisieren','CMD','gpupdate /force','Ändert lokalen Richtlinienstand.')
-      ]
-    },
-    {
-      match:/firefox warten/,
-      kind:'software',
-      label:'Firefox',
-      commands:[
-        command('Firefox Installation suchen','PowerShell','winget list --name Firefox','Installierte Version prüfen.'),
-        command('Firefox Updates prüfen','PowerShell','winget list --name Firefox --upgrade-available','Nur verfügbare Updates anzeigen.'),
-        command('Firefox reparieren','PowerShell','winget repair --name Firefox','Reparatur, falls Paket unterstützt.'),
-        command('Firefox Prozesse anzeigen','PowerShell','Get-Process firefox -ErrorAction SilentlyContinue | Select-Object Name, Id, Path','Laufende Instanzen prüfen.')
-      ]
-    },
-    {
-      match:/chrome warten/,
-      kind:'software',
-      label:'Chrome',
-      commands:[
-        command('Chrome Installation suchen','PowerShell','winget list --name "Google Chrome"','Installierte Version prüfen.'),
-        command('Chrome Updates prüfen','PowerShell','winget list --name "Google Chrome" --upgrade-available','Nur verfügbare Updates.'),
-        command('Chrome reparieren','PowerShell','winget repair --name "Google Chrome"','Reparatur, falls Paket unterstützt.'),
-        command('Chrome Prozesse anzeigen','PowerShell','Get-Process chrome -ErrorAction SilentlyContinue | Select-Object Name, Id, Path','Laufende Instanzen prüfen.')
-      ]
-    },
-    {
-      match:/adobe acrobat reader absichern/,
-      kind:'software',
-      label:'Adobe Acrobat',
-      commands:[
-        command('Adobe Installation suchen','PowerShell','winget list --name Adobe','Installierte Adobe-Pakete prüfen.'),
-        command('Adobe Updates prüfen','PowerShell','winget list --name Adobe --upgrade-available','Nur verfügbare Updates.'),
-        command('Benutzerzertifikate anzeigen','PowerShell','Get-ChildItem Cert:\\CurrentUser\\My | Select-Object Subject, Issuer, NotAfter','Signatur-/Zertifikatkontext.'),
-        command('Acrobat Prozesse anzeigen','PowerShell','Get-Process AcroRd32,Acrobat -ErrorAction SilentlyContinue | Select-Object Name, Id, Path','Laufende Adobe-Prozesse.')
-      ]
-    },
-    {
-      match:/microsoft office reparieren/,
-      kind:'software',
-      label:'Microsoft Office',
-      commands:[
-        command('Office Installation über Winget suchen','PowerShell','winget list --name Microsoft | Select-String -Pattern "Office|Microsoft 365"','Office/M365 Pakete finden.'),
-        command('Office Uninstall-Registry prüfen','PowerShell','Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*,HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Where-Object DisplayName -match "Office|Microsoft 365" | Select-Object DisplayName, DisplayVersion, Publisher','Klassische Installationen.'),
-        command('Office Prozesse anzeigen','PowerShell','Get-Process WINWORD,EXCEL,POWERPNT,OUTLOOK -ErrorAction SilentlyContinue | Select-Object Name, Id, Path','Laufende Office-Prozesse.'),
-        command('Office Updates über Winget prüfen','PowerShell','winget list --name Microsoft --upgrade-available | Select-String -Pattern "Office|Microsoft 365"','Nur falls Winget Office erkennt.')
-      ]
-    },
-    {
-      match:/visual c\+\+ redistributable prüfen/,
-      kind:'software',
-      label:'Visual C++',
-      commands:[
-        command('VC++ Pakete über Registry anzeigen','PowerShell','Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*,HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Where-Object DisplayName -match "Visual C\\+\\+" | Select-Object DisplayName, DisplayVersion, Publisher','32/64-Bit Installationen.'),
-        command('VC++ über Winget suchen','PowerShell','winget list --name "Visual C++"','Winget-Sicht prüfen.'),
-        command('VC++ Updates prüfen','PowerShell','winget list --name "Visual C++" --upgrade-available','Nur verfügbare Updates.')
-      ]
-    },
-    {
-      match:/\.net runtime prüfen/,
-      kind:'software',
-      label:'.NET',
-      commands:[
-        command('.NET Runtimes anzeigen','PowerShell','dotnet --list-runtimes','Installierte .NET-Runtimes.'),
-        command('.NET SDKs anzeigen','PowerShell','dotnet --list-sdks','Nur relevant bei Entwicklungsumgebung.'),
-        command('.NET Info anzeigen','PowerShell','dotnet --info','Gesamtkontext zur .NET-Installation.'),
-        command('.NET über Winget suchen','PowerShell','winget list --name ".NET"','Winget-Sicht prüfen.')
-      ]
-    },
-    {
-      match:/winget\/uniget inventur nutzen/,
-      kind:'software',
-      label:'Winget/Inventur',
-      commands:[
-        command('Winget Info anzeigen','PowerShell','winget --info','Version, Quellen und Richtlinien.'),
-        command('Installierte Pakete listen','PowerShell','winget list','Inventuransicht.'),
-        command('Pakete mit Updates anzeigen','PowerShell','winget list --upgrade-available','Nur Updates.'),
-        command('Paketliste exportieren','PowerShell','winget export -o "%TEMP%\\winget-export.json"','Erzeugt Exportdatei.')
-      ]
-    },
-    {
-      match:/ticket aus störung erstellen/,
-      kind:'process',
-      label:'Ticket/Diagnose',
-      commands:[
-        command('Systeminfo für Ticket erfassen','CMD','systeminfo','Basisdaten für Ticket.'),
-        command('Letzte Systemwarnungen anzeigen','PowerShell','Get-WinEvent -LogName System -MaxEvents 50 | Where-Object LevelDisplayName -in "Error","Warning" | Select-Object TimeCreated, ProviderName, LevelDisplayName, Message','Fehlerkontext.'),
-        command('IP-Kontext erfassen','CMD','ipconfig /all','Netzwerkdaten für Ticket.'),
-        command('Installierte Pakete exportieren','PowerShell','winget export -o "%TEMP%\\winget-ticket.json"','Softwarekontext für Ticket.')
-      ]
-    },
-    {
-      match:/neuinstallation vorbereiten/,
-      kind:'process',
-      label:'Neuinstallation',
-      commands:[
-        command('Systemdaten sichern','PowerShell','Get-ComputerInfo | Out-File "$env:TEMP\\computerinfo.txt"','Inventarkontext exportieren.'),
-        command('BitLocker Status prüfen','PowerShell','Get-BitLockerVolume C: | Format-List','Recovery-Risiko vor Neuinstallation.'),
-        command('Treiber-/Gerätestatus anzeigen','PowerShell','Get-PnpDevice | Where-Object Status -ne "OK" | Select-Object Status, Class, FriendlyName','Problemgeräte vor Neuinstallation.'),
-        command('Winget Paketliste exportieren','PowerShell','winget export -o "$env:TEMP\\winget-before-reinstall.json"','Softwareliste für Wiederaufbau.')
-      ]
-    },
-    {
-      match:/asset-umzug dokumentieren/,
-      kind:'process',
-      label:'Asset-Umzug',
-      commands:[
-        command('Netzwerkdaten vor Umzug sichern','CMD','ipconfig /all','Vorher-Werte.'),
-        command('Adapter/MAC dokumentieren','PowerShell','Get-NetAdapter | Select-Object Name, Status, LinkSpeed, MacAddress','MAC für Switch-Port-Suche.'),
-        command('Systemdaten dokumentieren','PowerShell','Get-ComputerInfo -Property CsName, CsManufacturer, CsModel, BiosSerialNumber, OsName','Asset-Kontext.'),
-        command('Nachbarn/Gateway prüfen','PowerShell','Get-NetNeighbor | Select-Object IPAddress, LinkLayerAddress, State','Netzkontext.')
-      ]
-    },
-    {
-      match:/ausmusterung planen/,
-      kind:'process',
-      label:'Ausmusterung',
-      commands:[
-        command('BitLocker Status dokumentieren','PowerShell','Get-BitLockerVolume | Select-Object MountPoint, VolumeStatus, ProtectionStatus','Datenschutz-/Verschlüsselungskontext.'),
-        command('Datenträger anzeigen','PowerShell','Get-Disk | Select-Object Number, FriendlyName, SerialNumber, HealthStatus, Size','Datenträger für Ausmusterung.'),
-        command('System-/Seriennummer dokumentieren','PowerShell','Get-CimInstance Win32_BIOS | Select-Object SerialNumber, SMBIOSBIOSVersion','Inventarbezug.'),
-        command('Installierte Software exportieren','PowerShell','winget export -o "$env:TEMP\\winget-retire.json"','Lizenz-/Softwarekontext.')
-      ]
-    },
-    {
-      match:/inventurprüfung durchführen/,
-      kind:'process',
-      label:'Inventur',
-      commands:[
-        command('Gerätebasisdaten anzeigen','PowerShell','Get-ComputerInfo -Property CsName, CsManufacturer, CsModel, BiosSerialNumber, OsName, OsVersion','Inventardaten abgleichen.'),
-        command('Hardwaredaten anzeigen','PowerShell','Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer, Model, TotalPhysicalMemory','Hardwareabgleich.'),
-        command('Netzwerkdaten anzeigen','CMD','ipconfig /all','IP/MAC/DNS abgleichen.'),
-        command('Softwareinventar anzeigen','PowerShell','winget list','Software-Sicht.')
-      ]
-    }
-  ];
-}
 function assetSummary(a){return `<div class="kv">${kv('Asset-ID',val(a,'Asset-ID'))}${kv('Gerätename',val(a,'Gerätename'))}${kv('Typ',val(a,'Asset-Typ'))}${kv('Standort',val(a,'Standort')+' / '+val(a,'Raum'))}${kv('Nutzer',val(a,'Hauptnutzer'))}${kv('Status',val(a,'Status'))}</div>`;}
 
 // Conditional logic helpers
@@ -2496,209 +1198,6 @@ function renderValidationSummary(){
 
 
 // ===== v26 SOFTWARE SMART CHECKLIST =====
-const SMART_SOFTWARE_PROFILES = {
-  windows: [
-    {key:'firefox', label:'Firefox installiert', vendor:'Mozilla', software:'Firefox', group:'Browser'},
-    {key:'chrome', label:'Chrome installiert', vendor:'Google', software:'Chrome', group:'Browser'},
-    {key:'adobe', label:'Adobe Reader installiert', vendor:'Adobe', software:'Acrobat Reader', group:'PDF / Signatur', children:[
-      {key:'adobeCertRequired', label:'Signatur-Zertifikat benötigt'},
-      {key:'adobeCertInstalled', label:'Signatur-Zertifikat installiert'}
-    ], knowledgeTitle:'Adobe Signatur-Zertifikat installieren'},
-    {key:'office', label:'Microsoft Office installiert', vendor:'Microsoft', software:'Microsoft Office', group:'Office', children:[
-      {key:'officeActivated', label:'Office aktiviert / lizenziert'}
-    ]},
-    {key:'uniget', label:'UniGet / WinGet installiert', vendor:'Microsoft', software:'UniGet / WinGet', group:'Systemtools'},
-    {key:'vcRuntime', label:'Visual C++ Runtime 2015–2022 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable', group:'Runtimes'},
-    {key:'dotnetRuntime', label:'.NET Runtime installiert', vendor:'Microsoft', software:'.NET Runtime', group:'Runtimes'},
-    {key:'vpnClient', label:'VPN Client installiert', vendor:'OpenVPN/Fortinet', software:'VPN Client', group:'Netzwerk'},
-    {key:'printerDrivers', label:'Druckertreiber installiert', vendor:'Hersteller', software:'Druckertreiber', group:'Drucker'},
-    {key:'bitlocker', label:'BitLocker aktiv', vendor:'Microsoft', software:'BitLocker', group:'Security'},
-    {key:'windowsUpdates', label:'Windows Updates aktuell', vendor:'Microsoft', software:'Windows Update', group:'Security'}
-  ],
-  linux: [
-    {key:'firefox', label:'Firefox installiert', vendor:'Mozilla', software:'Firefox', group:'Browser'},
-    {key:'chrome', label:'Chrome/Chromium installiert', vendor:'Google/Open Source', software:'Chrome/Chromium', group:'Browser'},
-    {key:'libreoffice', label:'LibreOffice installiert', vendor:'The Document Foundation', software:'LibreOffice', group:'Office'},
-    {key:'pdfViewer', label:'PDF Viewer installiert', vendor:'Open Source', software:'PDF Viewer', group:'PDF'},
-    {key:'cups', label:'CUPS / Drucker eingerichtet', vendor:'Open Source', software:'CUPS', group:'Drucker'},
-    {key:'vpnClient', label:'VPN Client installiert', vendor:'OpenVPN/WireGuard', software:'VPN Client', group:'Netzwerk'},
-    {key:'updates', label:'Systemupdates aktuell', vendor:'Linux', software:'Package Updates', group:'Security'}
-  ],
-  mac: [
-    {key:'firefox', label:'Firefox installiert', vendor:'Mozilla', software:'Firefox', group:'Browser'},
-    {key:'chrome', label:'Chrome installiert', vendor:'Google', software:'Chrome', group:'Browser'},
-    {key:'office', label:'Microsoft Office installiert', vendor:'Microsoft', software:'Microsoft Office', group:'Office'},
-    {key:'adobe', label:'Adobe Reader installiert', vendor:'Adobe', software:'Acrobat Reader', group:'PDF / Signatur', children:[
-      {key:'adobeCertRequired', label:'Signatur-Zertifikat benötigt'},
-      {key:'adobeCertInstalled', label:'Signatur-Zertifikat installiert'}
-    ], knowledgeTitle:'Adobe Signatur-Zertifikat macOS installieren'},
-    {key:'homebrew', label:'Homebrew installiert', vendor:'Open Source', software:'Homebrew', group:'Systemtools'},
-    {key:'vpnClient', label:'VPN Client installiert', vendor:'OpenVPN/Fortinet', software:'VPN Client', group:'Netzwerk'},
-    {key:'keychainCert', label:'Zertifikat im Schlüsselbund installiert', vendor:'Apple', software:'Keychain Certificate', group:'Security'}
-  ],
-  generic: [
-    {key:'browser', label:'Browser installiert', vendor:'-', software:'Browser', group:'Basis'},
-    {key:'office', label:'Office/PDF Basis vorhanden', vendor:'-', software:'Office/PDF', group:'Basis'},
-    {key:'updates', label:'Updates/Firmware aktuell', vendor:'-', software:'Update/Firmware', group:'Basis'}
-  ]
-};
-function getOsProfileName(){
-  const os = ((wizard && wizard.data && wizard.data.grund && wizard.data.grund.Betriebssystem) || '').toLowerCase();
-  if(os.includes('windows')) return 'windows';
-  if(os.includes('linux') || os.includes('ubuntu') || os.includes('debian')) return 'linux';
-  if(os.includes('mac')) return 'mac';
-  return 'generic';
-}
-function ensureSmartSoftwareState(){
-  if(!wizard || !wizard.data) return;
-  if(!wizard.data.smartSoftware) wizard.data.smartSoftware = {};
-  const profile = SMART_SOFTWARE_PROFILES[getOsProfileName()] || SMART_SOFTWARE_PROFILES.generic;
-  profile.forEach(item=>{
-    if(typeof wizard.data.smartSoftware[item.key] === 'undefined') wizard.data.smartSoftware[item.key] = false;
-    (item.children||[]).forEach(ch=>{
-      if(typeof wizard.data.smartSoftware[ch.key] === 'undefined') wizard.data.smartSoftware[ch.key] = false;
-    });
-  });
-}
-function smartSoftwareToggle(key, checked){
-  ensureSmartSoftwareState();
-  wizard.data.smartSoftware[key] = !!checked;
-  if(key === 'adobe' && !checked){
-    wizard.data.smartSoftware.adobeCertRequired = false;
-    wizard.data.smartSoftware.adobeCertInstalled = false;
-  }
-  if(key === 'adobeCertInstalled' && checked){
-    wizard.data.smartSoftware.adobeCertRequired = true;
-    wizard.data.smartSoftware.adobe = true;
-  }
-  renderWizard();
-  if(window.jQuery && (!APP_SETTINGS || APP_SETTINGS.animations)){
-    $('.software-smart-card').hide().fadeIn(130);
-  }
-}
-function renderSmartSoftwareStep(){
-  ensureSmartSoftwareState();
-  const profileName = getOsProfileName();
-  const profile = SMART_SOFTWARE_PROFILES[profileName] || SMART_SOFTWARE_PROFILES.generic;
-  const grouped = {};
-  profile.forEach(item=>{ if(!grouped[item.group]) grouped[item.group] = []; grouped[item.group].push(item); });
-  return `<h4>Software</h4>
-    <div class="alert alert-info software-smart-intro">OS-Profil: <b>${profileName.toUpperCase()}</b> · strukturierte Software-Checkliste statt Freitext.</div>
-    <div class="software-smart-grid">
-      ${Object.entries(grouped).map(([group,items])=>`
-        <div class="software-smart-group">
-          <div class="software-smart-group-title">${softwareGroupIcon(group)} ${group}</div>
-          ${items.map(renderSmartSoftwareItem).join('')}
-        </div>`).join('')}
-    </div>
-    <div class="software-smart-extra mt-3">
-      <label class="form-label">Zusatzsoftware / Bemerkung</label>
-      <textarea id="wizSoftware" class="form-control" rows="5" placeholder="Optional: eine Software pro Zeile, z. B. Firefox;125;Mozilla">${(wizard.data.software||[]).join('\n')}</textarea>
-    </div>
-    ${renderSmartSoftwareWarnings()}`;
-}
-function renderSmartSoftwareItem(item){
-  const state = wizard.data.smartSoftware || {};
-  const checked = state[item.key] ? 'checked' : '';
-  const childHtml = (item.children||[]).map(ch=>{
-    const childChecked = state[ch.key] ? 'checked' : '';
-    const disabled = item.key === 'adobe' && !state.adobe ? 'disabled' : '';
-    return `<label class="software-child ${disabled}">
-      <input type="checkbox" ${childChecked} ${disabled} onchange="smartSoftwareToggle('${ch.key}',this.checked)">
-      ${ch.label}
-    </label>`;
-  }).join('');
-  return `<div class="software-smart-card" data-softkey="${item.key}">
-    <label class="software-main-toggle">
-      <input type="checkbox" ${checked} onchange="smartSoftwareToggle('${item.key}',this.checked)">
-      <span>${item.label}</span>
-    </label>
-    <div class="software-meta">${item.vendor} · ${item.software}</div>
-    ${childHtml ? `<div class="software-children">${childHtml}</div>` : ''}
-    ${item.knowledgeTitle ? renderKnowledgeAction(item) : ''}
-  </div>`;
-}
-function renderKnowledgeAction(item){
-  const state = wizard.data.smartSoftware || {};
-  if(item.key === 'adobe' && state.adobe && state.adobeCertRequired && !state.adobeCertInstalled){
-    const kb = findKnowledgeByTitle(item.knowledgeTitle);
-    if(kb){
-      return `<div class="software-warning">⚠ Zertifikat fehlt · Knowledge vorhanden: <b>${kb['Knowledge-ID']}</b></div>`;
-    }
-    return `<div class="software-warning">⚠ Zertifikat fehlt · <button type="button" class="btn btn-sm btn-outline-warning" onclick="createKnowledgeForSoftware('${item.knowledgeTitle}')">Knowledge erstellen</button></div>`;
-  }
-  return '';
-}
-function renderSmartSoftwareWarnings(){
-  const state = wizard.data.smartSoftware || {};
-  const warnings = [];
-  if(state.adobe && state.adobeCertRequired && !state.adobeCertInstalled) warnings.push('Adobe Signatur-Zertifikat wird benötigt, ist aber noch nicht installiert.');
-  if(state.office && !state.officeActivated) warnings.push('Office installiert, Aktivierung/Lizenzstatus noch offen.');
-  if(!state.vcRuntime && getOsProfileName()==='windows') warnings.push('Visual C++ Runtime fehlt möglicherweise – häufige Ursache für Programmstartfehler.');
-  return warnings.length ? `<div class="mt-3">${warnings.map(w=>`<div class="alert alert-warning py-2 software-alert">${w}</div>`).join('')}</div>` : '';
-}
-function softwareGroupIcon(group){
-  const g = group.toLowerCase();
-  if(g.includes('browser')) return '🌐';
-  if(g.includes('pdf')) return '📄';
-  if(g.includes('office')) return '📦';
-  if(g.includes('runtime')) return '🧩';
-  if(g.includes('system')) return '🛠️';
-  if(g.includes('netzwerk')) return '🔐';
-  if(g.includes('drucker')) return '🖨️';
-  if(g.includes('security')) return '🛡️';
-  return '✅';
-}
-function findKnowledgeByTitle(title){
-  return (DB.knowledge || []).find(k => String(k.Titel||'').toLowerCase() === String(title||'').toLowerCase());
-}
-function createKnowledgeForSoftware(title){
-  if(!requireWriteAccess('Knowledge erstellen')) return;
-  if(!DB.knowledge) DB.knowledge = [];
-  const existing = findKnowledgeByTitle(title);
-  if(existing){ toast('Knowledge existiert bereits.'); renderWizard(); return; }
-  const id = nextId('knowledge','Knowledge-ID',ID_PREFIXES.knowledge);
-  DB.knowledge.push({
-    'Knowledge-ID': id, 'Titel': title, 'Kategorie': 'Software',
-    'Tags': 'adobe;zertifikat;signatur;software',
-    'Lösung': 'Zertifikat bereitstellen, in Adobe/Windows-Zertifikatsspeicher importieren, Signaturfunktion testen und Benutzer kurz einweisen.'
-  });
-  persist();
-  if(typeof maybeSaveDbToServer === 'function') maybeSaveDbToServer(); else if(typeof saveDbToServer === 'function') saveDbToServer();
-  toast('Knowledge-Eintrag erstellt.');
-  renderWizard();
-}
-function smartSoftwareRowsForAsset(assetId, deviceName){
-  ensureSmartSoftwareState();
-  const state = wizard.data.smartSoftware || {};
-  const profile = SMART_SOFTWARE_PROFILES[getOsProfileName()] || SMART_SOFTWARE_PROFILES.generic;
-  const rows = [];
-  profile.forEach(item=>{
-    if(state[item.key]){
-      rows.push({
-        'Software-ID': nextId('software','Software-ID',ID_PREFIXES.software),
-        'Asset-ID': assetId, 'Gerätename': deviceName,
-        'Softwarename': item.software, 'Version': '', 'Hersteller': item.vendor,
-        'Lizenzstatus': item.key === 'office' ? (state.officeActivated ? 'Aktiv' : 'Prüfen') : 'Aktiv',
-        'Update-Status': item.key === 'windowsUpdates' || item.key === 'updates' ? 'Aktuell' : 'Prüfen',
-        'Kritikalität': ['vcRuntime','dotnetRuntime','vpnClient','bitlocker'].includes(item.key) ? 'Hoch' : 'Normal',
-        'Bemerkung': smartSoftwareRemark(item.key, state)
-      });
-    }
-  });
-  return rows;
-}
-function smartSoftwareRemark(key, state){
-  if(key === 'adobe'){
-    if(state.adobeCertRequired && state.adobeCertInstalled) return 'Adobe Signatur-Zertifikat installiert.';
-    if(state.adobeCertRequired && !state.adobeCertInstalled) return 'Adobe Signatur-Zertifikat fehlt / Knowledge prüfen.';
-  }
-  if(key === 'office') return state.officeActivated ? 'Office aktiviert.' : 'Office installiert, Aktivierung prüfen.';
-  return 'Aus Smart-Software-Checkliste erstellt.';
-}
-
-function openDeviceWizard(){if(!requireWriteAccess('Neues Gerät erfassen')) return;wizard={step:0,data:{type:'PC',grund:{Standort:STAMM.standorte?.[0]||'Bibliothek',Raum:STAMM.raeume?.[0]||'',Status:STAMM.status?.[0]||'Aktiv',Hauptnutzer:'',Hersteller:STAMM.hersteller?.[0]||'',Modellserie:'',Modell:'',Seriennummer:'',Inventarnummer:'',Betriebssystem:STAMM.betriebssysteme?.[0]||'Windows 11',Domäne:STAMM.domaenen?.[0]||'EAH',Ausmusterungsdatum:'',Defektbeschreibung:'',Notizen:''},hardware:{CPU:'',RAM:'',Speicher:'',Monitor:'',Dockingstation:'',Druckertyp:'',Toner:'',Zählerstand:'',PoE:'',Controller:'',GarantieBis:'',Bemerkung:''},netzwerk:{Netzwerktyp:STAMM.netzwerktypen?.[0]||'LAN',Adressart:'DHCP',Verbindungstyp:STAMM.verbindungstypen?.[0]||'LAN direkt Wanddose','IP-Adresse':'',DNS:'','MAC-Adresse':'',VLAN:STAMM.vlans?.[0]||'',SwitchPort:STAMM.switches?.[0]||'',Wanddose:'',AccessPoint:STAMM.accesspoints?.[0]||'',SSID:STAMM.ssids?.[0]||'',Bemerkung:''},software:[],smartSoftware:{},notiz:''}};renderWizard();new bootstrap.Modal(document.getElementById('deviceWizardModal')).show();}
-function wizardSteps(){return ['Gerätetyp','Grunddaten','Hardware','Netzwerk','Software','Vorschau'];}
 
 // ===== v26.3 SAFE FORM HELPER FIX =====
 function safeEscape(value){
