@@ -41,7 +41,7 @@ Aktive Aufgaben aus Validierung und Marktvergleich. Alle Punkte klein, pruefbar 
 - [x] Admin Panel weiter in klare Gruppen gliedern: Datensicherung, Import, Export, Scanner, Stammdaten, System.
 - [x] Hilfe-Tab um Kontextlinks aus Fachansichten ergaenzen.
 - [x] Tastaturbedienung pruefen: Tab-Reihenfolge, Escape in Modalen, Enter bei Suche.
-- [ ] Mobile/kleine Fenster pruefen: Navigation, Admin Panel, Tabellen, Wizard und Help-Tab.
+- [x] Mobile/kleine Fenster pruefen: Navigation, Admin Panel, Tabellen, Wizard und Help-Tab.
 
 ## Erkennung und Normalisierung
 
@@ -115,22 +115,22 @@ Aktive Aufgaben aus Validierung und Marktvergleich. Alle Punkte klein, pruefbar 
 
 ## Import, Export und Migration
 
-- [ ] CSV-Import-Assistent um manuelle Zieltabellen-Auswahl erweitern.
-- [ ] CSV-Import-Assistent um Spaltenmapping erweitern.
-- [ ] CSV-Import-Assistent um Entwurfsmodus mit Uebernehmen/Verwerfen erweitern.
-- [ ] CSV-Import-Assistent vor Uebernahme zwingend Server-Backup ausloesen lassen.
-- [ ] Importprotokoll unter `logs/` oder `web_ui/backups/` schreiben.
-- [ ] Archiv-ZIP um Build-Info, Status und Testbericht erweitern.
-- [ ] Exportprofile im Admin Panel mit Kurzbeschreibung und erwarteter Zielsoftware anzeigen.
-- [ ] Offline-Fallback fuer fehlendes JSZip pruefen oder dokumentieren.
-- [ ] Demo-Daten, Seed-Daten und produktive CSVs sichtbarer voneinander trennen.
-- [ ] Optionalen SQLite-Migrationspfad als Konzept dokumentieren, ohne parallel umzusetzen.
+- [x] CSV-Import-Assistent um manuelle Zieltabellen-Auswahl erweitern.
+- [x] CSV-Import-Assistent um Spaltenmapping erweitern.
+- [x] CSV-Import-Assistent um Entwurfsmodus mit Uebernehmen/Verwerfen erweitern.
+- [x] CSV-Import-Assistent vor Uebernahme zwingend Server-Backup ausloesen lassen.
+- [x] Importprotokoll unter `logs/` oder `web_ui/backups/` schreiben.
+- [x] Archiv-ZIP um Build-Info, Status und Testbericht erweitern.
+- [x] Exportprofile im Admin Panel mit Kurzbeschreibung und erwarteter Zielsoftware anzeigen.
+- [x] Offline-Fallback fuer fehlendes JSZip pruefen oder dokumentieren.
+- [x] Demo-Daten, Seed-Daten und produktive CSVs sichtbarer voneinander trennen.
+- [x] Optionalen SQLite-Migrationspfad als Konzept dokumentieren, ohne parallel umzusetzen.
 
 ## Sicherheit und Betrieb
 
-- [ ] Lokale Bedrohungsannahme fuer `/api/save`, `/api/backup`, `/api/scanner/start` konkretisieren.
-- [ ] API-POST-Schutz um Token aus lokaler Session-Konfiguration pruefen, ohne externe Anmeldung einzufuehren.
-- [ ] Schreibaktionen im Admin Panel mit genauer Vorschau der betroffenen Tabellen anzeigen.
+- [x] Lokale Bedrohungsannahme fuer `/api/save`, `/api/backup`, `/api/scanner/start` konkretisieren.
+- [x] API-POST-Schutz um Token aus lokaler Session-Konfiguration pruefen, ohne externe Anmeldung einzufuehren.
+- [x] Schreibaktionen im Admin Panel mit genauer Vorschau der betroffenen Tabellen anzeigen.
 - [ ] Backup-Retention planen: Anzahl, Alter, manuelles Loeschen, kein automatischer Datenverlust.
 - [ ] Logs strukturieren: Serverstart, Scannerstart, Importpruefung, Backup, Fehler.
 - [ ] Startskripte einheitlich beschriften und Version v44/v45 klaeren.

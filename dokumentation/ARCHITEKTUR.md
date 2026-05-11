@@ -41,11 +41,15 @@ Die Modulaufteilung ist begonnen:
 
 - Der Server bindet lokal.
 - Schreibende API-Endpunkte lehnen fremde `Host`-, `Origin`- oder `Referer`-Kontexte ab.
+- Schreibende API-Endpunkte verlangen zusaetzlich ein beim Serverstart erzeugtes lokales Session-Token im Header `X-ITV-Session-Token`.
 - `/api/save` validiert Tabellen und Pflichtfelder.
 - Vor CSV-Schreibvorgaengen wird ein Backup angelegt.
 - Scannerstart bleibt an vorhandene Batchdateien gebunden.
+- Die lokale Bedrohungsannahme fuer `/api/save`, `/api/backup` und `/api/scanner/start` ist in [SICHERHEIT_UND_ARBEITSWEISE.md](SICHERHEIT_UND_ARBEITSWEISE.md) konkretisiert. Der Rollenmodus ist UI-Schutz, keine Authentifizierung.
 
 ## Datenmodell
 
 CSV bleibt Source of Truth. SQLite ist nur eine spaetere Option und wird nicht parallel eingefuehrt.
+
+Der optionale Pfad ist in [SQLITE_MIGRATION_KONZEPT.md](SQLITE_MIGRATION_KONZEPT.md) beschrieben. Er verlangt Backup, Vergleichsbericht, Rueckexport nach CSV und einen bewussten Umschaltpunkt; bis dahin bleibt `web_ui/data/*.csv` die produktive Datenquelle.
 

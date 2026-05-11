@@ -81,6 +81,68 @@ function safetyConfirm(action, detail=''){
   return confirm(`${text}\n\nFortfahren?`);
 }
 
+function productiveTablePreviews(){
+  const defs = (typeof exportTableDefinitions === 'function') ? exportTableDefinitions() : {};
+  return Object.entries(defs).map(([key, def]) => ({
+    key,
+    label:key,
+    file:def.filename || (key + '.csv'),
+    rows:Array.isArray(def.rows) ? def.rows.length : 0
+  }));
+}
+
+function affectedTablesText(items){
+  return (items || []).map(item => {
+    const count = typeof item.rows === 'number' ? ` (${item.rows} Zeilen aktuell)` : '';
+    return `- ${item.action}: ${item.file || item.label}${count}`;
+  }).join('\n');
+}
+
+function renderAffectedTablesPreview(title, items){
+  if(!Array.isArray(items) || !items.length) return '';
+  return `<div class="affected-preview">
+    <div class="affected-preview-title">${escapeHtml(title || 'Betroffene Daten')}</div>
+    ${items.map(item => `<div class="affected-preview-row">
+      <span>${escapeHtml(item.action || 'Aktion')}</span>
+      <code>${escapeHtml(item.file || item.label || '-')}</code>
+      ${typeof item.rows === 'number' ? `<span class="badge text-bg-light">${item.rows} Zeilen</span>` : ''}
+    </div>`).join('')}
+  </div>`;
+}
+
+function productiveWritePreview(action='schreibt'){
+  return productiveTablePreviews().map(item => ({...item, action}));
+}
+
+function csvBackupPreview(){
+  return productiveTablePreviews().map(item => ({...item, action:'kopiert'}));
+}
+
+function scannerAffectedPreview(mode){
+  const map = {
+    normal:[
+      {action:'schreibt/aktualisiert', file:'web_ui/data/assets.csv'},
+      {action:'schreibt/aktualisiert', file:'web_ui/data/hardware.csv'},
+      {action:'schreibt/aktualisiert', file:'web_ui/data/netzwerk.csv'}
+    ],
+    software:[
+      {action:'schreibt/aktualisiert', file:'web_ui/data/software_standard.csv'}
+    ],
+    software_full:[
+      {action:'schreibt Artefakt', file:'web_ui/data/software_full.csv'},
+      {action:'schreibt Artefakt', file:'web_ui/data/software_full.json'}
+    ],
+    full:[
+      {action:'schreibt Artefakt', file:'web_ui/data/software_full.csv'},
+      {action:'schreibt Artefakt', file:'web_ui/data/software_full.json'}
+    ],
+    check:[
+      {action:'prüft nur', file:'tools/hardware_scanner/*.ps1'}
+    ]
+  };
+  return map[mode] || [];
+}
+
 function statusAlertClass(type){
   return {success:'success', warning:'warning', error:'danger', info:'info'}[type] || 'info';
 }
@@ -141,12 +203,14 @@ function copyCommand(command){
 }
 
 function scannerCommandTile(title, text, command, tone, mode=''){
+  const preview = mode ? renderAffectedTablesPreview('Betroffene Dateien', scannerAffectedPreview(mode)) : '';
   const startButton = mode
     ? `<button class="btn btn-primary admin-action-button" onclick="startScanner('${escapeHtml(mode)}')" title="Startet diese Scanner-Aktion über den lokalen Python-Server in einer separaten Windows-Konsole." aria-label="Startet diese Scanner-Aktion über den lokalen Python-Server in einer separaten Windows-Konsole.">Jetzt starten</button>`
     : '';
   return `<div class="admin-action-tile scanner-command-tile scanner-command-${tone}">
     <div class="admin-action-title">${title}</div>
     <div class="admin-action-text">${text}</div>
+    ${preview}
     <code class="scanner-command">${command}</code>
     <div class="d-flex flex-wrap gap-2">
       ${startButton}

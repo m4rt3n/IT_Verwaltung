@@ -4,9 +4,9 @@ Lies zuerst `AGENTS.md` und `dokumentation/CODEX_ARBEITSKONZEPT.md`.
 
 Arbeite die naechste offene Aufgabe aus `TODO.md` ab:
 
-- Abschnitt: UI und UX
-- Aufgabe: Mobile/kleine Fenster pruefen: Navigation, Admin Panel, Tabellen, Wizard und Help-Tab.
-- Datei/Zeile: planung/TODO.md:44
+- Abschnitt: Sicherheit und Betrieb
+- Aufgabe: Backup-Retention planen: Anzahl, Alter, manuelles Loeschen, kein automatischer Datenverlust.
+- Datei/Zeile: planung/TODO.md:134
 
 Arbeitsregeln:
 

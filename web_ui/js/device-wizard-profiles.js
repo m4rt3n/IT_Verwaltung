@@ -1,0 +1,100 @@
+// Smart software checklist profiles for the device wizard.
+
+const SMART_SOFTWARE_PROFILES = {
+  windows: [
+    {key:'firefox', label:'Firefox installiert', vendor:'Mozilla', software:'Firefox', group:'Browser'},
+    {key:'chrome', label:'Chrome installiert', vendor:'Google', software:'Chrome', group:'Browser'},
+    {key:'edge', label:'Microsoft Edge installiert', vendor:'Microsoft', software:'Microsoft Edge', group:'Browser', packageId:'Microsoft.Edge'},
+    {key:'brave', label:'Brave installiert', vendor:'Brave', software:'Brave', group:'Browser', packageId:'Brave.Brave'},
+    {key:'adobe', label:'Adobe Reader installiert', vendor:'Adobe', software:'Acrobat Reader', group:'PDF / Signatur', children:[
+      {key:'adobeCertRequired', label:'Signatur-Zertifikat benötigt'},
+      {key:'adobeCertInstalled', label:'Signatur-Zertifikat installiert'}
+    ], knowledgeTitle:'Adobe Signatur-Zertifikat installieren'},
+    {key:'office', label:'Microsoft Office installiert', vendor:'Microsoft', software:'Microsoft Office', group:'Office', children:[
+      {key:'officeActivated', label:'Office aktiviert / lizenziert'}
+    ]},
+    {key:'libreoffice', label:'LibreOffice installiert', vendor:'The Document Foundation', software:'LibreOffice', group:'Office', packageId:'TheDocumentFoundation.LibreOffice'},
+    {key:'libreofficeHelp', label:'LibreOffice HelpPack installiert', vendor:'The Document Foundation', software:'LibreOffice HelpPack', group:'Office', packageId:'TheDocumentFoundation.LibreOffice.HelpPack'},
+    {key:'thunderbird', label:'Thunderbird installiert', vendor:'Mozilla', software:'Thunderbird', group:'Office', packageId:'Mozilla.Thunderbird.de'},
+    {key:'notepadpp', label:'Notepad++ installiert', vendor:'Notepad++', software:'Notepad++', group:'Office', packageId:'Notepad++.Notepad++'},
+    {key:'vlc', label:'VLC installiert', vendor:'VideoLAN', software:'VLC media player', group:'Medien', packageId:'VideoLAN.VLC'},
+    {key:'paintdotnet', label:'Paint.NET installiert', vendor:'dotPDN', software:'Paint.NET', group:'Medien', packageId:'dotPDN.PaintDotNet'},
+    {key:'gimp', label:'GIMP installiert', vendor:'GIMP', software:'GIMP', group:'Medien', packageId:'GIMP.GIMP.3'},
+    {key:'screenpresso', label:'Screenpresso installiert', vendor:'Learnpulse', software:'Screenpresso', group:'Medien', packageId:'Learnpulse.Screenpresso'},
+    {key:'obsStudio', label:'OBS Studio installiert', vendor:'OBS Project', software:'OBS Studio', group:'Medien', packageId:'OBSProject.OBSStudio'},
+    {key:'appInstaller', label:'Microsoft App Installer installiert', vendor:'Microsoft', software:'Microsoft App Installer', group:'Paketmanager', packageId:'Microsoft.AppInstaller'},
+    {key:'uniget', label:'UniGet / WinGet installiert', vendor:'Microsoft', software:'UniGet / WinGet', group:'Paketmanager', packageId:'MartiCliment.UniGetUI'},
+    {key:'chocolatey', label:'Chocolatey installiert', vendor:'Chocolatey', software:'Chocolatey', group:'Paketmanager', packageId:'Chocolatey.Chocolatey'},
+    {key:'chocolateyGui', label:'Chocolatey GUI installiert', vendor:'Chocolatey', software:'Chocolatey GUI', group:'Paketmanager', packageId:'Chocolatey.ChocolateyGUI'},
+    {key:'powershell', label:'PowerShell installiert', vendor:'Microsoft', software:'PowerShell', group:'Systemtools', packageId:'Microsoft.PowerShell'},
+    {key:'terminal', label:'Windows Terminal installiert', vendor:'Microsoft', software:'Windows Terminal', group:'Systemtools', packageId:'Microsoft.WindowsTerminal'},
+    {key:'powertoys', label:'PowerToys installiert', vendor:'Microsoft', software:'PowerToys', group:'Systemtools', packageId:'Microsoft.PowerToys'},
+    {key:'sysinternals', label:'Sysinternals installiert', vendor:'Microsoft', software:'Sysinternals', group:'Systemtools', packageId:'Microsoft.Sysinternals'},
+    {key:'pcHealthCheck', label:'Windows PC Health Check installiert', vendor:'Microsoft', software:'Windows PC Health Check', group:'Systemtools', packageId:'Microsoft.WindowsPCHealthCheck'},
+    {key:'supportRecovery', label:'Support and Recovery Assistant installiert', vendor:'Microsoft', software:'Support and Recovery Assistant', group:'Systemtools', packageId:'Microsoft.SupportAndRecoveryAssistant'},
+    {key:'windowsInstallationAssistant', label:'Windows Installation Assistant installiert', vendor:'Microsoft', software:'Windows Installation Assistant', group:'Systemtools', packageId:'Microsoft.WindowsInstallationAssistant'},
+    {key:'crystalDiskInfo', label:'CrystalDiskInfo installiert', vendor:'Crystal Dew World', software:'CrystalDiskInfo', group:'Diagnose', packageId:'CrystalDewWorld.CrystalDiskInfo'},
+    {key:'cpuZ', label:'CPU-Z installiert', vendor:'CPUID', software:'CPU-Z', group:'Diagnose', packageId:'CPUID.CPU-Z'},
+    {key:'hwinfo', label:'HWiNFO installiert', vendor:'REALiX', software:'HWiNFO', group:'Diagnose', packageId:'REALiX.HWiNFO'},
+    {key:'driverBooster', label:'Driver Booster installiert', vendor:'IObit', software:'Driver Booster', group:'Diagnose', packageId:'IObit.DriverBooster'},
+    {key:'vcRuntime2005x86', label:'Visual C++ 2005 x86 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2005 x86', group:'Runtimes', packageId:'Microsoft.VCRedist.2005.x86'},
+    {key:'vcRuntime2005x64', label:'Visual C++ 2005 x64 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2005 x64', group:'Runtimes', packageId:'Microsoft.VCRedist.2005.x64'},
+    {key:'vcRuntime2008x86', label:'Visual C++ 2008 x86 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2008 x86', group:'Runtimes', packageId:'Microsoft.VCRedist.2008.x86'},
+    {key:'vcRuntime2008x64', label:'Visual C++ 2008 x64 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2008 x64', group:'Runtimes', packageId:'Microsoft.VCRedist.2008.x64'},
+    {key:'vcRuntime2010x86', label:'Visual C++ 2010 x86 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2010 x86', group:'Runtimes', packageId:'Microsoft.VCRedist.2010.x86'},
+    {key:'vcRuntime2010x64', label:'Visual C++ 2010 x64 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2010 x64', group:'Runtimes', packageId:'Microsoft.VCRedist.2010.x64'},
+    {key:'vcRuntime2012x86', label:'Visual C++ 2012 x86 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2012 x86', group:'Runtimes', packageId:'Microsoft.VCRedist.2012.x86'},
+    {key:'vcRuntime2012x64', label:'Visual C++ 2012 x64 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2012 x64', group:'Runtimes', packageId:'Microsoft.VCRedist.2012.x64'},
+    {key:'vcRuntime2013x86', label:'Visual C++ 2013 x86 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2013 x86', group:'Runtimes', packageId:'Microsoft.VCRedist.2013.x86'},
+    {key:'vcRuntime2013x64', label:'Visual C++ 2013 x64 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2013 x64', group:'Runtimes', packageId:'Microsoft.VCRedist.2013.x64'},
+    {key:'vcRuntime2015x86', label:'Visual C++ 2015+ x86 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2015+ x86', group:'Runtimes', packageId:'Microsoft.VCRedist.2015+.x86'},
+    {key:'vcRuntime2015x64', label:'Visual C++ 2015+ x64 installiert', vendor:'Microsoft', software:'Visual C++ Redistributable 2015+ x64', group:'Runtimes', packageId:'Microsoft.VCRedist.2015+.x64'},
+    {key:'vcRuntime', label:'Visual C++ Runtime-Basis geprüft', vendor:'Microsoft', software:'Visual C++ Redistributable', group:'Runtimes'},
+    {key:'dotnetRuntime', label:'.NET Runtime installiert', vendor:'Microsoft', software:'.NET Runtime', group:'Runtimes'},
+    {key:'dotnetSdk10', label:'.NET SDK 10 installiert', vendor:'Microsoft', software:'.NET SDK 10', group:'Runtimes', packageId:'Microsoft.DotNet.SDK.10'},
+    {key:'directx', label:'DirectX installiert', vendor:'Microsoft', software:'DirectX', group:'Runtimes', packageId:'Microsoft.DirectX'},
+    {key:'sevenZip', label:'7-Zip installiert', vendor:'7-Zip', software:'7-Zip', group:'Tools', packageId:'7zip.7zip'},
+    {key:'devHome', label:'Dev Home installiert', vendor:'Microsoft', software:'Dev Home', group:'Entwicklung', packageId:'Microsoft.DevHome'},
+    {key:'vscode', label:'Visual Studio Code installiert', vendor:'Microsoft', software:'Visual Studio Code', group:'Entwicklung', packageId:'Microsoft.VisualStudioCode'},
+    {key:'vscodeCli', label:'Visual Studio Code CLI installiert', vendor:'Microsoft', software:'Visual Studio Code CLI', group:'Entwicklung', packageId:'Microsoft.VisualStudioCode.CLI'},
+    {key:'anaconda', label:'Anaconda installiert', vendor:'Anaconda', software:'Anaconda', group:'Entwicklung', packageId:'Anaconda.Anaconda3'},
+    {key:'rstudio', label:'RStudio installiert', vendor:'Posit', software:'RStudio', group:'Entwicklung', packageId:'Posit.RStudio'},
+    {key:'mysqlWorkbench', label:'MySQL Workbench installiert', vendor:'Oracle', software:'MySQL Workbench', group:'Entwicklung', packageId:'Oracle.MySQLWorkbench'},
+    {key:'pythonLauncher', label:'Python Launcher installiert', vendor:'Python', software:'Python Launcher', group:'Entwicklung', packageId:'Python.Launcher'},
+    {key:'jdk25', label:'Oracle JDK 25 installiert', vendor:'Oracle', software:'Oracle JDK 25', group:'Entwicklung', packageId:'Oracle.JDK.25'},
+    {key:'wsl', label:'Windows Subsystem for Linux installiert', vendor:'Microsoft', software:'Windows Subsystem for Linux', group:'Entwicklung', packageId:'Microsoft.WSL'},
+    {key:'windowsAdk', label:'Windows ADK installiert', vendor:'Microsoft', software:'Windows ADK', group:'Entwicklung', packageId:'Microsoft.WindowsADK'},
+    {key:'autoIt', label:'AutoIt installiert', vendor:'AutoIt', software:'AutoIt', group:'Entwicklung', packageId:'AutoIt.AutoIt'},
+    {key:'weka', label:'Weka installiert', vendor:'University of Waikato', software:'Weka', group:'Entwicklung', packageId:'UniversityOfWaikato.Weka'},
+    {key:'vpnClient', label:'VPN Client installiert', vendor:'OpenVPN/Fortinet', software:'VPN Client', group:'Netzwerk'},
+    {key:'printerDrivers', label:'Druckertreiber installiert', vendor:'Hersteller', software:'Druckertreiber', group:'Drucker'},
+    {key:'bitlocker', label:'BitLocker aktiv', vendor:'Microsoft', software:'BitLocker', group:'Security'},
+    {key:'windowsUpdates', label:'Windows Updates aktuell', vendor:'Microsoft', software:'Windows Update', group:'Security'}
+  ],
+  linux: [
+    {key:'firefox', label:'Firefox installiert', vendor:'Mozilla', software:'Firefox', group:'Browser'},
+    {key:'chrome', label:'Chrome/Chromium installiert', vendor:'Google/Open Source', software:'Chrome/Chromium', group:'Browser'},
+    {key:'libreoffice', label:'LibreOffice installiert', vendor:'The Document Foundation', software:'LibreOffice', group:'Office'},
+    {key:'pdfViewer', label:'PDF Viewer installiert', vendor:'Open Source', software:'PDF Viewer', group:'PDF'},
+    {key:'cups', label:'CUPS / Drucker eingerichtet', vendor:'Open Source', software:'CUPS', group:'Drucker'},
+    {key:'vpnClient', label:'VPN Client installiert', vendor:'OpenVPN/WireGuard', software:'VPN Client', group:'Netzwerk'},
+    {key:'updates', label:'Systemupdates aktuell', vendor:'Linux', software:'Package Updates', group:'Security'}
+  ],
+  mac: [
+    {key:'firefox', label:'Firefox installiert', vendor:'Mozilla', software:'Firefox', group:'Browser'},
+    {key:'chrome', label:'Chrome installiert', vendor:'Google', software:'Chrome', group:'Browser'},
+    {key:'office', label:'Microsoft Office installiert', vendor:'Microsoft', software:'Microsoft Office', group:'Office'},
+    {key:'adobe', label:'Adobe Reader installiert', vendor:'Adobe', software:'Acrobat Reader', group:'PDF / Signatur', children:[
+      {key:'adobeCertRequired', label:'Signatur-Zertifikat benötigt'},
+      {key:'adobeCertInstalled', label:'Signatur-Zertifikat installiert'}
+    ], knowledgeTitle:'Adobe Signatur-Zertifikat macOS installieren'},
+    {key:'homebrew', label:'Homebrew installiert', vendor:'Open Source', software:'Homebrew', group:'Systemtools'},
+    {key:'vpnClient', label:'VPN Client installiert', vendor:'OpenVPN/Fortinet', software:'VPN Client', group:'Netzwerk'},
+    {key:'keychainCert', label:'Zertifikat im Schlüsselbund installiert', vendor:'Apple', software:'Keychain Certificate', group:'Security'}
+  ],
+  generic: [
+    {key:'browser', label:'Browser installiert', vendor:'-', software:'Browser', group:'Basis'},
+    {key:'office', label:'Office/PDF Basis vorhanden', vendor:'-', software:'Office/PDF', group:'Basis'},
+    {key:'updates', label:'Updates/Firmware aktuell', vendor:'-', software:'Update/Firmware', group:'Basis'}
+  ]
+};

@@ -17,6 +17,8 @@ Erwartung:
 - JavaScript-Syntax OK fuer alle produktiven Dateien unter `web_ui/js/`, sobald Node.js installiert oder auffindbar ist
 - Die Ausgabe `Node-Quelle` zeigt bevorzugt Standard-Node.js aus `PATH`, `Program Files` oder Benutzerprofil; Adobe-Node ist nur als Fallback vorgesehen.
 - Smoke-Test OK fuer `/api/status`, `/api/load`, `/api/help`, `/api/software-full`, CSV-Header, Stammdaten, Startdateien, Import-Vorschau-Helfer, Pflichtfeldvalidierung, unvollstaendige Save-Payloads, lokalen POST-Schutz und unbekannte Scanner-Modi.
+- Smoke-Test OK fuer POST-Session-Token: `/api/status` liefert ein Token, POST ohne Token wird abgelehnt und POST mit Token durchlaeuft danach die jeweilige Fachvalidierung.
+- Lokale Bedrohungsannahme ist dokumentiert: `/api/save`, `/api/backup` und `/api/scanner/start` nennen Bedrohung, aktiven Schutz und Restrisiko.
 - `scripts\Check-WebApp-Syntax.bat` gibt am Ende eine Zusammenfassung fuer Python, Quality-Check, PowerShell, JavaScript und Smoke-Test aus.
 
 Automatisch bleiben bewusst ohne Browser, UAC und produktive Datenuebernahme:
@@ -161,8 +163,27 @@ Manuell im Browser:
 - Admin Panel öffnen.
 - `Notion Export ZIP`, `Excel CSV ZIP` und `Archiv ZIP` starten.
 - Erwartung: Sicherheitsabfrage erscheint und danach wird eine ZIP-Datei erzeugt.
+- Archiv ZIP öffnen.
+- Erwartung: `backup.json`, `csv/`, `README.txt`, `meta/build-info.json`, `meta/server-status.json` und `TESTBERICHT.md` sind enthalten.
+- Erwartung: Die Exportprofile zeigen zu Notion, Excel/LibreOffice und Archiv ZIP jeweils Kurzbeschreibung, Zielsoftware und erwarteten Inhalt.
+- Erwartung: Wenn JSZip nicht geladen ist, zeigt der Exportbereich einen sichtbaren Hinweis; ZIP-Exportaktionen brechen ohne Datenänderung mit Hinweis ab.
 - `CSV prüfen` mit einer produktiven CSV-Kopie öffnen.
 - Erwartung: Vorschau zeigt erkannte Tabelle, Trennzeichen, Zeilenzahl, Pflichtfeldprüfung und ID-Dublettenhinweise.
+- Zieltabelle in der Vorschau manuell auf eine andere Tabelle umstellen.
+- Erwartung: Pflichtspalten, Zeilenhinweise und Vorschlagszahlen werden neu für diese Tabelle berechnet; die automatische Erkennung bleibt als Hinweis sichtbar.
+- Im Bereich `Spaltenmapping` eine Pflichtspalte auf `Nicht zuordnen` stellen.
+- Erwartung: Die Vorschau meldet die fehlende Pflichtspalte und berechnet betroffene Zeilen als `unklar`.
+- Eine CSV-Quellspalte wieder der Zielspalte zuordnen.
+- Erwartung: Pflichtspaltenzähler, Zeilenhinweise und Vorschauwerte werden neu berechnet.
+- `Entwurf übernehmen` anklicken.
+- Erwartung: Ein Importentwurf wird als schreibgeschützt angezeigt; `neu`/`update`-Zeilen werden gezählt, `doppelt`/`unklar` werden verworfen.
+- `Backup vor Übernahme` anklicken.
+- Erwartung: Sicherheitsabfrage erscheint, `/api/backup` und `/api/import-log` werden aufgerufen und der Entwurf zeigt Backup- und Protokollnamen. Ohne aktives CSV Backend erscheint eine Warnung.
+- Erwartung: Unter `web_ui/backups/import_logs/` entsteht ein JSON-Protokoll mit Datei, Ziel, Mapping, Zeilenzahlen, Vorschlägen und Backup-Referenz.
+- Mapping oder Zieltabelle ändern.
+- Erwartung: Ein nicht mehr passender Entwurf wird als veraltet angezeigt.
+- `Entwurf verwerfen` anklicken.
+- Erwartung: Der temporäre Entwurf verschwindet, ohne produktive Daten zu ändern.
 - Erwartung: Die CSV-Prüfung schreibt keine Daten und bietet keine direkte Übernahme an.
 
 ## Suche und Filter je Tab
@@ -202,7 +223,19 @@ Manuell im Browser:
 - Erwartung: Vorschau/Sicherheitsabfrage erscheint vor dem Schreiben.
 - Admin Panel öffnen.
 - Erwartung: Scanner- und Speicheraktionen sind nach Risiko markiert.
+- Erwartung: Schreibaktionen im Admin Panel zeigen eine Vorschau der betroffenen Tabellen oder Dateien, z. B. CSV speichern, CSV-Backup, Backup-Import und Scannerstart.
+- Erwartung: Der Bereich `Datenbereiche` trennt produktive CSVs, Scannerartefakte und Demo/Seed sichtbar voneinander.
 - Tastatur prüfen: `/` fokussiert Suche, Pfeiltasten navigieren Listen, `Ctrl+S` speichert nur im geöffneten Bearbeitungsmodal.
+
+## Kleine Fenster und Mobile
+
+Manuell im Browser bei ca. 390 px, 760 px und 1024 px Breite prüfen:
+
+- Navigation bricht ohne horizontales Seiten-Scrolling um; Suche, Rollenwahl und Hauptaktionen bleiben bedienbar.
+- Admin Panel zeigt Aktionskacheln einspaltig und Befehle laufen nicht aus den Karten.
+- Tabellen bleiben horizontal innerhalb der Tabellenbox scrollbar, nicht auf Seitenebene.
+- Geräte-Wizard und Office-Wizard zeigen Schritte, Footer-Buttons und Formularfelder einspaltig und ohne Überdeckung.
+- Software-Karten, Full-Scan-Details und Help-Tab bleiben lesbar; Codeblöcke und lange Pfade scrollen innerhalb ihres Containers.
 
 ## Rollenmodus prüfen
 

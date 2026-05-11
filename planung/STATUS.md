@@ -1,19 +1,19 @@
 # Planungsstatus
 
-Generiert: 2026-05-07 12:07:32
+Generiert: 2026-05-11 16:41:59
 
 ## Fortschritt
 
 - NEXT: 0/0 erledigt (100%)
-- TODO: 89/125 erledigt (71%)
+- TODO: 103/125 erledigt (82%)
 - WARTESCHLANGE: 0/0 erledigt (100%)
 
 ## Naechster Arbeitsauftrag
 
 - Quelle: `TODO`
-- Abschnitt: `UI und UX`
-- Zeile: `44`
-- Aufgabe: Mobile/kleine Fenster pruefen: Navigation, Admin Panel, Tabellen, Wizard und Help-Tab.
+- Abschnitt: `Sicherheit und Betrieb`
+- Zeile: `134`
+- Aufgabe: Backup-Retention planen: Anzahl, Alter, manuelles Loeschen, kein automatischer Datenverlust.
 
 ## Offene Aufgaben
 
@@ -21,20 +21,6 @@ Generiert: 2026-05-07 12:07:32
 - Keine offenen Aufgaben.
 
 ### TODO
-- `UI und UX`: Mobile/kleine Fenster pruefen: Navigation, Admin Panel, Tabellen, Wizard und Help-Tab.
-- `Import, Export und Migration`: CSV-Import-Assistent um manuelle Zieltabellen-Auswahl erweitern.
-- `Import, Export und Migration`: CSV-Import-Assistent um Spaltenmapping erweitern.
-- `Import, Export und Migration`: CSV-Import-Assistent um Entwurfsmodus mit Uebernehmen/Verwerfen erweitern.
-- `Import, Export und Migration`: CSV-Import-Assistent vor Uebernahme zwingend Server-Backup ausloesen lassen.
-- `Import, Export und Migration`: Importprotokoll unter `logs/` oder `web_ui/backups/` schreiben.
-- `Import, Export und Migration`: Archiv-ZIP um Build-Info, Status und Testbericht erweitern.
-- `Import, Export und Migration`: Exportprofile im Admin Panel mit Kurzbeschreibung und erwarteter Zielsoftware anzeigen.
-- `Import, Export und Migration`: Offline-Fallback fuer fehlendes JSZip pruefen oder dokumentieren.
-- `Import, Export und Migration`: Demo-Daten, Seed-Daten und produktive CSVs sichtbarer voneinander trennen.
-- `Import, Export und Migration`: Optionalen SQLite-Migrationspfad als Konzept dokumentieren, ohne parallel umzusetzen.
-- `Sicherheit und Betrieb`: Lokale Bedrohungsannahme fuer `/api/save`, `/api/backup`, `/api/scanner/start` konkretisieren.
-- `Sicherheit und Betrieb`: API-POST-Schutz um Token aus lokaler Session-Konfiguration pruefen, ohne externe Anmeldung einzufuehren.
-- `Sicherheit und Betrieb`: Schreibaktionen im Admin Panel mit genauer Vorschau der betroffenen Tabellen anzeigen.
 - `Sicherheit und Betrieb`: Backup-Retention planen: Anzahl, Alter, manuelles Loeschen, kein automatischer Datenverlust.
 - `Sicherheit und Betrieb`: Logs strukturieren: Serverstart, Scannerstart, Importpruefung, Backup, Fehler.
 - `Sicherheit und Betrieb`: Startskripte einheitlich beschriften und Version v44/v45 klaeren.
@@ -87,6 +73,7 @@ Generiert: 2026-05-07 12:07:32
 - `dokumentation/HISTORIE.md`
 - `dokumentation/IMPORT_EXPORT_KONZEPT.md`
 - `dokumentation/ITAM_ITSM_MODELL.md`
+- `dokumentation/JS_MODULARISIERUNG.md`
 - `dokumentation/KONTEXTGRUPPEN.md`
 - `dokumentation/NETWORK_DROPDOWN_FIX_V24.md`
 - `dokumentation/NETWORK_FILTERING_V23.md`
@@ -104,6 +91,7 @@ Generiert: 2026-05-07 12:07:32
 - `dokumentation/SOFTWARE_FULL_DUPLIKATE.md`
 - `dokumentation/SOFTWARE_FULL_PRODUKTFAMILIEN.md`
 - `dokumentation/SOFTWARE_SMART_V26.md`
+- `dokumentation/SQLITE_MIGRATION_KONZEPT.md`
 - `dokumentation/STAMMDATEN_UI_UPGRADE.md`
 - `dokumentation/STARTDATEIEN.md`
 - `dokumentation/TAB_GRUPPEN.md`

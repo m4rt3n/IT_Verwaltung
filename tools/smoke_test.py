@@ -31,7 +31,13 @@ def get_json(base_url: str, path: str) -> object:
         return json.load(response)
 
 
-def post_json(base_url: str, path: str, payload: object, origin: str | None = None) -> tuple[int, str]:
+def post_json(
+    base_url: str,
+    path: str,
+    payload: object,
+    origin: str | None = None,
+    token: str | None = None,
+) -> tuple[int, str]:
     raw = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         base_url + path,
@@ -41,6 +47,8 @@ def post_json(base_url: str, path: str, payload: object, origin: str | None = No
     )
     if origin:
         request.add_header("Origin", origin)
+    if token:
+        request.add_header("X-ITV-Session-Token", token)
     try:
         with urllib.request.urlopen(request, timeout=10) as response:
             return response.status, response.read().decode("utf-8")
@@ -86,14 +94,22 @@ def check_stammdaten_files() -> None:
 
 
 def check_import_preview_helper() -> None:
-    admin_js = (PROJECT_ROOT / "web_ui" / "js" / "admin.js").read_text(encoding="utf-8-sig")
+    admin_import_js = (PROJECT_ROOT / "web_ui" / "js" / "admin-import.js").read_text(encoding="utf-8-sig")
     required_tokens = [
         "openCsvImportAssistant",
         "analyzeCsvImport",
         "showCsvImportPreview",
+        "renderCsvMappingPanel",
+        "Spaltenmapping",
+        "acceptCsvImportDraft",
+        "Entwurf übernehmen",
+        "prepareCsvImportDraftBackup",
+        "Backup vor Übernahme",
+        "writeCsvImportProtocol",
+        "/api/import-log",
         "Diese Vorschau schreibt keine Daten",
     ]
-    missing = [token for token in required_tokens if token not in admin_js]
+    missing = [token for token in required_tokens if token not in admin_import_js]
     if missing:
         raise AssertionError("CSV-Import-Vorschau unvollstaendig: " + ", ".join(missing))
     fixture = PROJECT_ROOT / "tools" / "fixtures" / "import_preview_assets.csv"
@@ -106,6 +122,70 @@ def check_import_preview_helper() -> None:
         raise AssertionError("CSV-Import-Beispieldatei ist nicht plausibel.")
 
 
+def check_export_profiles_helper() -> None:
+    admin_export_js = (PROJECT_ROOT / "web_ui" / "js" / "admin-export.js").read_text(encoding="utf-8-sig")
+    required_tokens = [
+        "renderExportProfiles",
+        "Notion Export ZIP",
+        "Microsoft Excel / LibreOffice Calc",
+        "Archiv ZIP",
+        "exportNotionZip",
+        "exportExcelCsvZip",
+        "exportArchiveZip",
+        "zipDependencyStatus",
+        "zipUnavailableText",
+        "Offline-Betrieb",
+    ]
+    missing = [token for token in required_tokens if token not in admin_export_js]
+    if missing:
+        raise AssertionError("Exportprofile unvollstaendig: " + ", ".join(missing))
+
+
+def check_data_area_helper() -> None:
+    admin_js = (PROJECT_ROOT / "web_ui" / "js" / "admin.js").read_text(encoding="utf-8-sig")
+    required_tokens = [
+        "renderDataSeparationCard",
+        "Produktive CSVs",
+        "Scannerartefakte",
+        "Demo / Seed",
+        "data_areas",
+    ]
+    missing = [token for token in required_tokens if token not in admin_js]
+    if missing:
+        raise AssertionError("Datenbereich-Anzeige unvollstaendig: " + ", ".join(missing))
+
+
+def check_api_token_helper() -> None:
+    data_api_js = (PROJECT_ROOT / "web_ui" / "js" / "data-api.js").read_text(encoding="utf-8-sig")
+    required_tokens = [
+        "apiPostHeaders",
+        "post_token",
+        "X-ITV-Session-Token",
+    ]
+    missing = [token for token in required_tokens if token not in data_api_js]
+    if missing:
+        raise AssertionError("API-POST-Token-Helfer unvollstaendig: " + ", ".join(missing))
+
+
+def check_admin_write_preview_helper() -> None:
+    ui_js = (PROJECT_ROOT / "web_ui" / "js" / "ui.js").read_text(encoding="utf-8-sig")
+    admin_scanner_js = (PROJECT_ROOT / "web_ui" / "js" / "admin-scanner.js").read_text(encoding="utf-8-sig")
+    data_api_js = (PROJECT_ROOT / "web_ui" / "js" / "data-api.js").read_text(encoding="utf-8-sig")
+    required_tokens = [
+        "renderAffectedTablesPreview",
+        "affectedTablesText",
+        "productiveWritePreview",
+        "csvBackupPreview",
+        "scannerAffectedPreview",
+        "Schreibvorschau beim Import",
+        "Betroffene Tabellen",
+    ]
+    source = "\n".join([ui_js, admin_scanner_js, data_api_js])
+    missing = [token for token in required_tokens if token not in source]
+    if missing:
+        raise AssertionError("Admin-Schreibvorschau unvollstaendig: " + ", ".join(missing))
+
+
 def main() -> None:
     app_server.ensure_dirs()
     if app_server.TABLE_FILES.get("software") != "software_standard.csv":
@@ -116,6 +196,10 @@ def main() -> None:
     check_start_files()
     check_stammdaten_files()
     check_import_preview_helper()
+    check_export_profiles_helper()
+    check_data_area_helper()
+    check_api_token_helper()
+    check_admin_write_preview_helper()
 
     config = app_server.load_app_config()
     port = app_server.find_free_port(int(config.get("port", 8765)), int(config.get("port_scan_range", 50)))
@@ -131,6 +215,14 @@ def main() -> None:
             raise AssertionError("/api/status meldet nicht die tatsaechliche Smoke-Test-URL")
         if status.get("table_files", {}).get("software") != "software_standard.csv":
             raise AssertionError("/api/status meldet nicht software_standard.csv als aktive Software-Tabelle")
+        data_areas = status.get("data_areas", {})
+        if not isinstance(data_areas, dict) or not data_areas.get("productive"):
+            raise AssertionError("/api/status liefert keine Datenbereich-Klassifikation")
+        if len(data_areas.get("demo_seed", [])) < 2:
+            raise AssertionError("/api/status trennt Demo-/Seed-Daten nicht sichtbar")
+        post_token = str(status.get("post_token", ""))
+        if not status.get("post_token_required") or len(post_token) < 20:
+            raise AssertionError("/api/status liefert kein plausibles POST-Session-Token")
         if "node" not in status:
             raise AssertionError("/api/status liefert keine Node-Erkennung")
 
@@ -152,7 +244,13 @@ def main() -> None:
 
         app_server.validate_payload(data)
 
-        incomplete_status, incomplete_text = post_json(base_url, "/api/save", {"assets": []})
+        missing_token_status, missing_token_text = post_json(base_url, "/api/backup", {})
+        if missing_token_status != 403 or "Session-Token" not in missing_token_text:
+            raise AssertionError(
+                f"POST ohne Session-Token wurde nicht abgelehnt: {missing_token_status} {missing_token_text}"
+            )
+
+        incomplete_status, incomplete_text = post_json(base_url, "/api/save", {"assets": []}, token=post_token)
         if incomplete_status != 500 or "Payload unvollst" not in incomplete_text:
             raise AssertionError(
                 f"Unvollstaendige Save-Payload wurde nicht sauber abgelehnt: {incomplete_status} {incomplete_text}"
@@ -163,11 +261,23 @@ def main() -> None:
             "/api/backup",
             {},
             origin="https://example.invalid",
+            token=post_token,
         )
         if rejected_status != 403:
             raise AssertionError(f"Fremder Origin wurde nicht abgelehnt: {rejected_status} {rejected_text}")
 
-        scanner_status, scanner_text = post_json(base_url, "/api/scanner/start", {"mode": "unbekannt"})
+        import_log_status, import_log_text = post_json(
+            base_url,
+            "/api/import-log",
+            {"filename": "x.csv"},
+            token=post_token,
+        )
+        if import_log_status != 400 or "Importprotokoll unvoll" not in import_log_text:
+            raise AssertionError(
+                f"Unvollstaendiges Importprotokoll wurde nicht sauber abgelehnt: {import_log_status} {import_log_text}"
+            )
+
+        scanner_status, scanner_text = post_json(base_url, "/api/scanner/start", {"mode": "unbekannt"}, token=post_token)
         if scanner_status != 400:
             raise AssertionError(f"Ungueltiger Scanner-Modus wurde nicht abgelehnt: {scanner_status} {scanner_text}")
 
@@ -179,9 +289,14 @@ def main() -> None:
         print("- Startdateien: OK")
         print("- Stammdaten: OK")
         print("- Import-Vorschau-Helfer: OK")
+        print("- Exportprofile: OK")
+        print("- Datenbereich-Trennung: OK")
+        print("- POST-Session-Token: OK")
+        print("- Admin-Schreibvorschau: OK")
         print("- Unvollstaendige Save-Payload: OK")
         print(f"- Hilfeartikel: {len(docs)}")
         print("- Lokale POST-Schutzpruefung: OK")
+        print("- Importprotokoll-Schutz: OK")
         print("- Scanner-Startschutz: OK")
     finally:
         server.shutdown()

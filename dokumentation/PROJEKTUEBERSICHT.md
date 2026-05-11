@@ -114,6 +114,8 @@ CSV-Dateien:
 
 `web_ui/data/software_full.csv` ist kein produktiver Web-App-Datenbestand, sondern ein lokales Scanner-Artefakt aus dem Full-Software-Scan. Die Datei wird nicht versioniert und nicht ueber die normale Web-App-Persistenz verwaltet.
 
+Demo- und Seed-Daten sind davon getrennt: `web_ui/demo_data.json` dient als Beispiel-/Testvorlage, `SEED` in `web_ui/js/app-config.js` als Browser-Fallback. Das Admin Panel zeigt produktive CSVs, Scannerartefakte und Demo/Seed im Bereich `Datenbereiche` getrennt an.
+
 ## Nächste technische Ziele
 
 Die kurzfristige Queue wurde am 2026-05-07 in fuehrende Dokumentation ueberfuehrt. Neue Arbeit soll wieder als kleine, konkrete Aufgabe begonnen werden und nicht als zweite Roadmap neben der Dokumentation wachsen.

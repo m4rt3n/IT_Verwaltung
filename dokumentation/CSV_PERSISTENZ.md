@@ -33,6 +33,21 @@ web_ui/backups/backup_YYYYMMDD_HHMMSS/
 Beim Neustart werden die CSV-Dateien aus `web_ui/data/` geladen.
 Damit bleiben Änderungen erhalten.
 
+## Datenbereiche
+
+Produktive CSV-Dateien, Demo-/Seed-Daten und Scannerartefakte werden bewusst getrennt behandelt:
+
+- Produktive Tabellen: `assets.csv`, `hardware.csv`, `software_standard.csv`, `netzwerk.csv`, `tickets.csv`, `notizen.csv` und `knowledge.csv` unter `web_ui/data/`. Nur diese Dateien werden durch `/api/load`, `/api/save` und `/api/backup` als normaler Arbeitsdatenbestand verwaltet.
+- Demo-Daten: `web_ui/demo_data.json` ist eine Vorlage fuer Test- und Beispielzustände. Sie darf nicht still in produktive CSVs gemischt werden.
+- Browser-Seed: `SEED` in `web_ui/js/app-config.js` ist ein Fallback fuer lokale Browserdaten, wenn kein gespeicherter Browserzustand vorhanden ist.
+- Scannerartefakte: `software_full.csv` und `software_full.json` unter `web_ui/data/` sind Roh-/Diagnoseausgaben des Full-Software-Scans und keine produktiven Tabellen.
+
+Das Admin Panel zeigt diese Bereiche unter `Datenbereiche` sichtbar getrennt an. Diese Anzeige ist rein informativ und schreibt keine Daten.
+
+## Optionale SQLite-Migration
+
+CSV bleibt die aktuelle produktive Persistenz. Ein moeglicher spaeterer SQLite-Wechsel ist nur als kontrollierter Migrationspfad dokumentiert und wird nicht parallel aktiviert. Details stehen in `SQLITE_MIGRATION_KONZEPT.md`.
+
 ## Spaltenabgleich
 
 Stand: 2026-05-05

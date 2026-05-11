@@ -16,6 +16,8 @@ Die Web-App fragt bei manuellen Schreibaktionen nach, bevor Daten verändert ode
 
 Diese Schreibbestätigung ist absichtlich nicht abschaltbar.
 
+Admin-Schreibaktionen zeigen zusaetzlich eine Vorschau der betroffenen Tabellen oder Dateien. Dadurch ist vor dem Ausloesen sichtbar, ob produktive CSV-Dateien geschrieben, nur in ein Backup kopiert oder Scannerartefakte erzeugt werden.
+
 ## Admin Panel als Speicherzentrale
 
 Backup, Import, Export und manuelles CSV-Speichern bleiben im Admin Panel im Bereich `Backup & Import` gebündelt:
@@ -27,6 +29,8 @@ Backup, Import, Export und manuelles CSV-Speichern bleiben im Admin Panel im Ber
 - CSV-Ordner-Backup
 
 Dashboard, Asset-, Hardware-, Software-, Netzwerk-, Ticket-, Notiz- und Knowledge-Ansichten sollen keine separaten Backup-, Import-, Export- oder CSV-Speicherbuttons erhalten.
+
+Die Admin-Kacheln nennen bei Schreib- und Scanneraktionen die betroffenen Tabellen/Dateien. Die gleiche Liste erscheint in der Sicherheitsabfrage vor dem Ausloesen.
 
 ## Rollenmodus
 
@@ -44,6 +48,10 @@ Details: [ROLLEN_RECHTE.md](ROLLEN_RECHTE.md).
 
 Der Server bindet lokal und laesst als Host nur `127.0.0.1` oder `localhost` zu. Schreibende API-Endpunkte unter `/api/` lehnen fremde `Host`-, `Origin`- oder `Referer`-Kontexte ab.
 
+Zusaetzlich erzeugt der Server beim Start ein lokales Session-Token fuer POST-Anfragen. Die Web-App liest dieses Token ueber `/api/status` und sendet es bei schreibenden API-Aufrufen als Header `X-ITV-Session-Token` mit. POST-Anfragen ohne gueltiges Token werden abgelehnt.
+
+Dieses Token ist bewusst keine Anmeldung. Es bindet schreibende Requests an die aktuell geladene lokale App-Sitzung und erschwert fremde Webseiten- oder Formular-POSTs, ersetzt aber keine Benutzerverwaltung.
+
 `app_server.py` akzeptiert beim Speichern nur vollständige Datenpakete. Diese Tabellen müssen vorhanden und Listen sein:
 
 - `assets`
@@ -57,6 +65,77 @@ Der Server bindet lokal und laesst als Host nur `127.0.0.1` oder `localhost` zu.
 Fehlt eine Tabelle oder ist eine Tabelle kein Array, bricht der Server den Speichervorgang ab. Dadurch werden fehlende Tabellen nicht mehr versehentlich als leere CSV geschrieben.
 
 Vor jedem erfolgreichen CSV-Schreiben wird ein Backup unter `web_ui/backups/backup_YYYYMMDD_HHMMSS/` erstellt.
+
+## Lokale Bedrohungsannahme
+
+Die App ist fuer einen lokalen Einzelplatzbetrieb gedacht. Der Schutz richtet sich gegen versehentliche Bedienfehler, fremde Webseiten im Browser und unvollstaendige oder falsche Payloads. Er ersetzt keine Mehrbenutzer-Authentifizierung.
+
+Annahmen:
+
+- Der Server laeuft nur auf `127.0.0.1` oder `localhost`.
+- Der Benutzer, der den Server startet, darf die lokalen Projektdateien lesen und schreiben.
+- Andere Prozesse desselben Windows-Benutzers koennen grundsaetzlich lokale Dateien und lokale Ports erreichen.
+- Der Rollenmodus `Admin` / `Normal` ist UI-Schutz, keine serverseitige Anmeldung.
+- Wenn `start.bat` mit Administratorrechten laeuft, gelten diese Rechte auch fuer serverseitig gestartete Scannerprozesse.
+
+### `/api/save`
+
+Bedrohung:
+
+- unvollstaendige Tabellen koennten produktive CSV-Dateien leeren,
+- manipulierte Browser- oder Fremdseiten-Requests koennten Daten ueberschreiben,
+- fehlerhafte Pflichtfelder koennten spaetere Auswertungen brechen.
+
+Aktiver Schutz:
+
+- fremde `Host`-, `Origin`- und `Referer`-Kontexte werden abgelehnt,
+- gueltiges lokales Session-Token im Header `X-ITV-Session-Token` ist erforderlich,
+- Payload muss alle produktiven Tabellen als Listen enthalten,
+- Pflichtfelder werden serverseitig geprueft,
+- vor jedem erfolgreichen Schreiben wird ein Backup erstellt.
+
+Restrisiko:
+
+- Ein lokaler Prozess oder ein Benutzer mit Zugriff auf `localhost` und Projektdateien kann weiterhin bewusst Requests senden oder Dateien direkt veraendern.
+
+### `/api/backup`
+
+Bedrohung:
+
+- fremde Webseiten koennten viele Backups ausloesen,
+- Backups koennten Speicherplatz verbrauchen,
+- ein Backup koennte faelschlich als Schreibschutz verstanden werden.
+
+Aktiver Schutz:
+
+- fremde `Host`-, `Origin`- und `Referer`-Kontexte werden abgelehnt,
+- gueltiges lokales Session-Token im Header `X-ITV-Session-Token` ist erforderlich,
+- Backups schreiben nur in `web_ui/backups/`,
+- produktive CSV-Dateien werden dabei nicht veraendert.
+
+Restrisiko:
+
+- Backup-Retention ist noch nicht automatisiert. Viele bewusste lokale Backup-Aufrufe koennen Speicher belegen.
+
+### `/api/scanner/start`
+
+Bedrohung:
+
+- ein fremder Request koennte lokale Batchdateien starten,
+- ein falscher Scanner-Modus koennte unerwartete Daten schreiben,
+- bei Administratorstart laufen Scanner mit hoeheren Rechten.
+
+Aktiver Schutz:
+
+- fremde `Host`-, `Origin`- und `Referer`-Kontexte werden abgelehnt,
+- gueltiges lokales Session-Token im Header `X-ITV-Session-Token` ist erforderlich,
+- nur Modi aus der festen Allowlist in `SCANNER_COMMANDS` sind erlaubt,
+- der Scannerstart bleibt an vorhandene Batchdateien im Repository gebunden,
+- unbekannte Modi werden mit HTTP 400 abgelehnt.
+
+Restrisiko:
+
+- Ein bewusst handelnder lokaler Benutzer kann Scannerstarts ausloesen. Echte Zugriffskontrolle waere erst mit serverseitigem Token, Anmeldung oder Betriebssystem-Rechtekonzept erreicht.
 
 ## Scanner-Regeln
 

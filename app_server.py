@@ -8,7 +8,7 @@ Start:
 
 Funktion:
   - startet den lokalen Webserver fuer web_ui
-  - stellt /api/load, /api/help, /api/save und /api/backup bereit
+  - stellt /api/load, /api/help, /api/save, /api/backup und /api/import-log bereit
   - laedt web_ui/data/*.csv mit Semikolon- oder Komma-Erkennung
   - prueft Save-Payloads vor dem Schreiben auf Vollstaendigkeit
   - erstellt vor jedem CSV-Schreibvorgang ein Backup unter web_ui/backups
@@ -19,6 +19,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -35,11 +36,15 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 WEB_ROOT = PROJECT_ROOT / "web_ui"
 DATA_DIR = WEB_ROOT / "data"
 BACKUP_DIR = WEB_ROOT / "backups"
+IMPORT_LOG_DIR = BACKUP_DIR / "import_logs"
 PREFERRED_PORT = 8765
 SOFTWARE_FULL_JSON = DATA_DIR / "software_full.json"
+DEMO_DATA_FILE = WEB_ROOT / "demo_data.json"
 HELP_DIR = PROJECT_ROOT / "dokumentation" / "help"
 CONFIG_DIR = PROJECT_ROOT / "web_ui" / "config"
 APP_CONFIG_FILE = CONFIG_DIR / "app_config.json"
+SESSION_POST_TOKEN = secrets.token_urlsafe(32)
+SESSION_POST_TOKEN_HEADER = "X-ITV-Session-Token"
 
 DEFAULT_APP_CONFIG = {
     "host": "127.0.0.1",
@@ -121,6 +126,7 @@ REQUIRED_FIELDS = {
 def ensure_dirs() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    IMPORT_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 def find_free_port(start: int, scan_range: int = 50) -> int:
     port = start
@@ -175,6 +181,10 @@ def local_request_allowed(headers) -> bool:
         if parsed.hostname and parsed.hostname.lower() not in allowed_hosts:
             return False
     return True
+
+def session_token_allowed(headers) -> bool:
+    token = headers.get(SESSION_POST_TOKEN_HEADER, "")
+    return bool(token) and secrets.compare_digest(token, SESSION_POST_TOKEN)
 
 def sniff_delimiter(path: Path) -> str:
     try:
@@ -264,6 +274,42 @@ def load_software_full() -> dict[str, object]:
                 row.setdefault("Gerätename", asset_info.get("Gerätename", ""))
     return payload
 
+def data_area_status() -> dict[str, object]:
+    productive = []
+    for key, filename in TABLE_FILES.items():
+        path = DATA_DIR / filename
+        productive.append({
+            "key": key,
+            "file": str(path.relative_to(PROJECT_ROOT)),
+            "exists": path.exists(),
+            "role": "productive-csv",
+        })
+    scanner_artifacts = []
+    for filename in ("software_full.csv", "software_full.json"):
+        path = DATA_DIR / filename
+        scanner_artifacts.append({
+            "file": str(path.relative_to(PROJECT_ROOT)),
+            "exists": path.exists(),
+            "role": "scanner-artifact",
+        })
+    return {
+        "productive": productive,
+        "scanner_artifacts": scanner_artifacts,
+        "demo_seed": [
+            {
+                "file": str(DEMO_DATA_FILE.relative_to(PROJECT_ROOT)),
+                "exists": DEMO_DATA_FILE.exists(),
+                "role": "demo-file",
+            },
+            {
+                "file": "web_ui/js/app-config.js:SEED",
+                "exists": True,
+                "role": "browser-seed-fallback",
+            },
+        ],
+        "note": "Produktive Tabellen liegen unter web_ui/data und werden durch /api/load, /api/save und /api/backup verwaltet. Demo-/Seed-Daten sind nur Vorlagen/Fallbacks; software_full.* sind Scannerartefakte.",
+    }
+
 def load_help_docs() -> dict[str, object]:
     docs: list[dict[str, str]] = []
     for slug, title, filename in HELP_FILES:
@@ -293,6 +339,35 @@ def backup_all() -> Path:
         src = DATA_DIR / filename
         if src.exists():
             shutil.copy2(src, target / filename)
+    return target
+
+def write_import_log(payload: dict[str, object]) -> Path:
+    ensure_dirs()
+    if not isinstance(payload, dict):
+        raise ValueError("Importprotokoll-Payload muss ein JSON-Objekt sein.")
+    required = ["filename", "target", "rows", "backup"]
+    missing = [key for key in required if not str(payload.get(key, "")).strip()]
+    if missing:
+        raise ValueError("Importprotokoll unvollständig. Fehlend: " + ", ".join(missing))
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    target = IMPORT_LOG_DIR / f"import_{stamp}.json"
+    protocol = {
+        "app": "IT-Verwaltung",
+        "format": "itverwaltung-csv-import-protocol-v1",
+        "createdAt": datetime.now().isoformat(timespec="seconds"),
+        "mode": "draft-prepared-no-data-written",
+        "filename": str(payload.get("filename", "")),
+        "target": str(payload.get("target", "")),
+        "backup": str(payload.get("backup", "")),
+        "rows": int(payload.get("rows", 0)),
+        "discarded": int(payload.get("discarded", 0)),
+        "suggestions": payload.get("suggestions", {}),
+        "mapping": payload.get("mapping", {}),
+        "signature": str(payload.get("signature", "")),
+        "note": "Dieses Protokoll dokumentiert nur den vorbereiteten Importentwurf. Es wurden keine produktiven CSV-Daten geschrieben.",
+    }
+    with target.open("w", encoding="utf-8") as f:
+        json.dump(protocol, f, ensure_ascii=False, indent=2)
     return target
 
 def validate_payload(payload: dict[str, object]) -> None:
@@ -417,6 +492,10 @@ class Handler(SimpleHTTPRequestHandler):
                     "node": detect_node_runtime(),
                     "help_docs": [title for _, title, _ in HELP_FILES],
                     "scanner_modes": list(SCANNER_COMMANDS.keys()),
+                    "data_areas": data_area_status(),
+                    "post_token_required": True,
+                    "post_token_header": SESSION_POST_TOKEN_HEADER,
+                    "post_token": SESSION_POST_TOKEN,
                 })
             except Exception as e:
                 self.send_text(f"Fehler beim Status: {e}", 500)
@@ -427,6 +506,9 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlparse(self.path).path
         if path.startswith("/api/") and not local_request_allowed(self.headers):
             self.send_text("Lokale Anfrage abgelehnt.", 403)
+            return
+        if path.startswith("/api/") and not session_token_allowed(self.headers):
+            self.send_text("Lokales Session-Token fehlt oder ist ungueltig.", 403)
             return
         if path == "/api/save":
             try:
@@ -446,6 +528,20 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_json({"ok": True, "backup": str(target.name)})
             except Exception as e:
                 self.send_text(f"Fehler beim Backup: {e}", 500)
+            return
+        if path == "/api/import-log":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+                payload = json.loads(raw)
+                if not isinstance(payload, dict):
+                    raise ValueError("Payload muss ein JSON-Objekt sein.")
+                target = write_import_log(payload)
+                self.send_json({"ok": True, "log": str(target.relative_to(BACKUP_DIR))})
+            except ValueError as e:
+                self.send_text(str(e), 400)
+            except Exception as e:
+                self.send_text(f"Fehler beim Importprotokoll: {e}", 500)
             return
         if path == "/api/scanner/start":
             try:

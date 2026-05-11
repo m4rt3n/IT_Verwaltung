@@ -66,6 +66,14 @@ async function loadServerStatus(){
   }
 }
 
+function apiPostHeaders(extra={}){
+  const headers = {...extra};
+  const token = SERVER_STATUS?.post_token || '';
+  const tokenHeader = SERVER_STATUS?.post_token_header || 'X-ITV-Session-Token';
+  if(token) headers[tokenHeader] = token;
+  return headers;
+}
+
 async function loadDbFromServer(){
   try{
     const res = await fetch('/api/load?v=' + Date.now());
@@ -132,12 +140,13 @@ async function saveDbToServer(manual=false){
   try{
     const check = validateDbBeforeWrite();
     if(!check.ok) throw new Error(check.message);
-    if(manual && !safetyConfirm('CSV-Dateien jetzt speichern?', 'Vor dem Schreiben erstellt der Server automatisch ein Backup.')){
+    const preview = productiveWritePreview('schreibt');
+    if(manual && !safetyConfirm('CSV-Dateien jetzt speichern?', 'Vor dem Schreiben erstellt der Server automatisch ein Backup.\n\nBetroffene Tabellen:\n' + affectedTablesText(preview))){
       return false;
     }
     const res = await fetch('/api/save', {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:apiPostHeaders({'Content-Type':'application/json'}),
       body:JSON.stringify(DB)
     });
     if(!res.ok){
@@ -162,10 +171,11 @@ async function saveDbToServer(manual=false){
 async function backupCsvServer(){
   try{
     if(typeof requireWriteAccess === 'function' && !requireWriteAccess('CSV-Backup erstellen')) return false;
-    if(!safetyConfirm('CSV-Ordner-Backup erstellen?', 'Es werden Kopien der aktuellen CSV-Dateien unter web_ui/backups abgelegt.')){
+    const preview = csvBackupPreview();
+    if(!safetyConfirm('CSV-Ordner-Backup erstellen?', 'Es werden Kopien der aktuellen CSV-Dateien unter web_ui/backups abgelegt.\n\nBetroffene Tabellen:\n' + affectedTablesText(preview))){
       return false;
     }
-    const res = await fetch('/api/backup', {method:'POST'});
+    const res = await fetch('/api/backup', {method:'POST', headers:apiPostHeaders()});
     if(!res.ok) throw new Error(await res.text());
     notify('CSV-Ordner-Backup wurde erstellt.', 'success');
     return true;

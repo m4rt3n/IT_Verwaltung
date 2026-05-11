@@ -45,7 +45,22 @@ Aktuelle Knowledge-Erweiterung:
 - Die Knowledge-Karte `KB-0103` enthält nun ein integriertes Office-Auswahltool mit Schrittleiste und generierter, keyfreier `configuration.xml`.
 - Der Office-Wizard erzeugt zusätzlich `MSO-Config.reg` und `README.txt`; Registry-/Policy-Importe erfordern eine eigene Bestätigung.
 - Die Office-Wizard-Vorschau bietet temporäre Product-Key-Felder für Volumenlizenz-Produkte; diese werden nicht gespeichert und nur in die aktuelle XML-Ausgabe übernommen.
-- JavaScript wurde in erste fachliche Module zerlegt: `office-wizard.js`, `knowledge.js`, `software.js` und `device-wizard.js`; Details und weitere Schritte stehen in `JS_MODULARISIERUNG.md`.
+- JavaScript wurde weiter in fachliche Module zerlegt: u. a. `app-config.js`, `app-state.js`, `asset-view.js`, `office-wizard.js`, `knowledge.js`, `software-full*.js`, `software-standard.js`, `software-profiles.js`, `layout.js`, `quality.js` und `device-wizard.js`; Details und weitere Schritte stehen in `JS_MODULARISIERUNG.md`.
+- Die Modularisierung wurde vertieft: `app.js` ist nur noch Start-/Klebelogik; Admin, Office-Wizard, Device-Wizard, Software-Full, Standardsoftware, Workflow-/Listen-UI und CRUD sind in fachliche Include-Dateien getrennt. Der Smoke-Test prueft die ausgelagerte CSV-Import-Vorschau jetzt in `admin-import.js`.
+- Kleine Viewports wurden nachgezogen: Navbar, Tab-Gruppen, Filter, Tabellencontainer, Admin-Kacheln, Softwarekarten, Help-Tab sowie Geräte- und Office-Wizard erhalten responsive Regeln fuer schmale Fenster.
+- Der CSV-Import-Assistent kann die Zieltabellen-Pruefung manuell umstellen. Die Vorschau wird neu analysiert, bleibt aber weiterhin schreibgeschuetzt ohne Datenuebernahme.
+- Der CSV-Import-Assistent hat ein freies Spaltenmapping fuer die Vorschau erhalten. Pflichtfelder, ID-Dubletten und Vorschlagszahlen werden aus den gemappten Zielzeilen berechnet.
+- Der CSV-Import-Assistent kann plausible Zeilen in einen temporaeren, schreibgeschuetzten Entwurf uebernehmen und diesen wieder verwerfen. Produktives Schreiben bleibt bis Backup und Importprotokoll gesperrt.
+- Der CSV-Import-Assistent erzwingt vor einer spaeteren Uebernahme ein Server-Backup: Der Entwurf wird erst nach erfolgreichem `/api/backup` als uebernahmebereit markiert.
+- Der lokale Server bietet `/api/import-log`; nach erfolgreichem Backup schreibt der Import-Assistent ein JSON-Protokoll unter `web_ui/backups/import_logs/` und markiert den Entwurf erst danach als vorbereitet.
+- Das Archiv-ZIP enthaelt nun neben Backup und CSV-Kopien auch `meta/build-info.json`, `meta/server-status.json` und `TESTBERICHT.md`.
+- Das Admin Panel zeigt Exportprofile mit Kurzbeschreibung, Zielsoftware und erwarteten Inhalten fuer Notion, Excel/LibreOffice und Archiv-ZIP.
+- Der Exportbereich prueft die JSZip-Verfuegbarkeit sichtbar und dokumentiert den CDN-/Offline-Fall; bei fehlendem JSZip bleiben ZIP-Exporte blockiert, ohne lokale Daten zu veraendern.
+- Das Admin Panel zeigt nun `Datenbereiche` getrennt nach produktiven CSVs, Scannerartefakten und Demo/Seed; `/api/status` liefert dieselbe Klassifikation fuer Checks und Diagnose.
+- `SQLITE_MIGRATION_KONZEPT.md` dokumentiert einen optionalen spaeteren SQLite-Pfad mit Backup, Nur-Lese-Prototyp, Vergleichsbericht, Rueckexport und bewusstem Umschaltpunkt; CSV bleibt produktive Wahrheit.
+- Die lokale Bedrohungsannahme fuer `/api/save`, `/api/backup` und `/api/scanner/start` ist konkretisiert: lokale Einzelplatzannahme, aktive Schutzmechanismen und Restrisiken sind dokumentiert.
+- Schreibende API-Aufrufe verlangen nun zusaetzlich zum lokalen Host-/Origin-Schutz ein beim Serverstart erzeugtes Session-Token im Header `X-ITV-Session-Token`; die Web-App uebernimmt es aus `/api/status`.
+- Admin-Schreibaktionen zeigen eine Vorschau der betroffenen Tabellen oder Dateien direkt in den Kacheln und erneut in der Sicherheitsabfrage.
 
 ## Umgang mit alten Dateien
 
